@@ -12,7 +12,6 @@
 
 #define BUFSIZE 1024
 #define N_CONNECTIONS 3
-#define SIZETYPE 3
 
 void get(int fd, char *filedir, char *filename);
 void put(int fd, char *filename);
