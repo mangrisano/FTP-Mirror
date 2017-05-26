@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in info_server, info_client;
     int server, port, client;
     pid_t child;
-    char *message, *command, *param;
+    char *address_client, *command, *param;
     ssize_t nbytes;
     socklen_t address_client_len = sizeof(info_client);
     int i = 0;
@@ -52,8 +52,17 @@ int main(int argc, char *argv[]) {
         if (client == -1) {
             perror("Error accept");
             continue;
+        }            
+        address_client = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+        if (address_client == NULL) {
+            perror("Error malloc");
+            exit(EXIT_FAILURE);
         }
-        printf("New connection n° %d from: %s\n", ++i, inet_ntoa(info_client.sin_addr));
+        sprintf(address_client, "New connection n° %d from: %s\n", ++i, inet_ntoa(info_client.sin_addr));
+        if (write(STDOUT_FILENO, address_client, strlen(address_client)) < strlen(address_client)) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
+        }
         if ((child = fork()) == -1) {
             perror("Error fork");
             exit(EXIT_FAILURE);
@@ -71,11 +80,6 @@ int main(int argc, char *argv[]) {
             }
             param = (char *) malloc(sizeof(char) * BUFSIZE + 1);
             if (param == NULL) {
-                perror("Error malloc");
-                exit(EXIT_FAILURE);
-            }
-            message = (char *) malloc(sizeof(char) * BUFSIZE + 1);
-            if (message == NULL) {
                 perror("Error malloc");
                 exit(EXIT_FAILURE);
             }
@@ -120,10 +124,10 @@ int main(int argc, char *argv[]) {
                 }
             }
             free(command);
-            free(message);
             free(param);
             _exit(EXIT_SUCCESS);
         } 
+        free(address_client);
         /* Processo padre */
         if (close(client) == -1) {
             perror("Error close");
