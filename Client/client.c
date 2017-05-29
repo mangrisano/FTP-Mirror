@@ -13,8 +13,9 @@
 int main(int argc, char *argv[]) {
     struct sockaddr_in info_server;
     int server;
-    char *command, *params, type[4];
-    int found;
+    char *command, *params, type[3];
+    int found, f;
+    char *f_content;
     ssize_t nbytes;
     const char *error = "Command not found!\n";
     if (argc < 3) {
@@ -74,11 +75,7 @@ int main(int argc, char *argv[]) {
     }
     read(server, &found, sizeof(found));
     if (found == 1) {
-        if (write(STDOUT_FILENO, "Found\n", 6) < 6) {
-            perror("Error write");
-            exit(EXIT_FAILURE);
-        }
-        nbytes = read(server, type, 4);
+        nbytes = read(server, type, 3);
         if (nbytes == -1) {
             perror("Error read");
             exit(EXIT_FAILURE);
@@ -86,13 +83,43 @@ int main(int argc, char *argv[]) {
         if (nbytes == 0) {
             exit(EXIT_SUCCESS);
         }
-        if (write(STDOUT_FILENO, type, strlen(type)) < strlen(type)) {
-            perror("Error write");
-            exit(EXIT_FAILURE);
+        if (strcmp(type, "REG") == 0) {
+            f_content = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+            if (f_content == NULL) {
+                perror("Error malloc");
+                exit(EXIT_FAILURE);
+            }
+            f = open(params, O_CREAT | O_RDWR, 0644);
+            if (f == -1) {
+                perror("Error open");
+                exit(EXIT_FAILURE);
+            }
+            nbytes = read(server, f_content, BUFSIZE);
+            if (nbytes == -1) {
+                perror("Error read");
+                exit(EXIT_FAILURE);
+            }
+            if (nbytes == 0) {
+                perror("No more bytes");
+                exit(EXIT_SUCCESS);
+            }
+            if (write(f, f_content, nbytes) < nbytes) {
+                perror("Error write");
+                exit(EXIT_SUCCESS);
+            }
+            if (write(STDOUT_FILENO, "File received with success!\n", 28) < 28) {
+                perror("Error write");
+                exit(EXIT_FAILURE);
+            }
+            free(f_content);
+            if (close(f) == -1) {
+                perror("Error closing file");
+                exit(EXIT_FAILURE);
+            }
         }
     }
     else {
-        write(STDOUT_FILENO, "no\n", 3);
+        write(STDOUT_FILENO, "File not found!\n", 16);
     }
     free(command);
     free(params);
