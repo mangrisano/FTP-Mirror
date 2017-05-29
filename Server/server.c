@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 
 #define BUFSIZE 1024
-#define N_CONNECTIONS 3
+#define PENDING_QUEUE 3
 
 void get(int fd, char *filedir, char *filename);
 void put(int fd, char *filename);
@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
         perror("Error bind");
         exit(EXIT_FAILURE);
     }
-    if (listen(server, N_CONNECTIONS) == -1) {
+    if (listen(server, PENDING_QUEUE) == -1) {
         perror("Error listen");
         exit(EXIT_FAILURE);
     }
