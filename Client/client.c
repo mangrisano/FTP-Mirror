@@ -17,6 +17,10 @@ int main(int argc, char *argv[]) {
     int found;
     ssize_t nbytes;
     const char *error = "Command not found!\n";
+    if (argc < 3) {
+        perror("Error arguments");
+        exit(EXIT_FAILURE);
+    }
     info_server.sin_family = AF_INET;
     info_server.sin_port = htons(5200);
     inet_aton("127.0.0.1", &info_server.sin_addr);
