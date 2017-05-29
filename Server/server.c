@@ -21,10 +21,9 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in info_server, info_client;
     int server, port, client;
     pid_t child;
-    char *address_client, *command, *param;
+    char *command, *param;
     ssize_t nbytes;
     socklen_t address_client_len = sizeof(info_client);
-    int i = 0;
     if (argc < 3) {
         perror("Error arguments");
         exit(EXIT_FAILURE);
@@ -52,16 +51,6 @@ int main(int argc, char *argv[]) {
             perror("Error accept");
             continue;
         }            
-        address_client = (char *) malloc(sizeof(char) * BUFSIZE + 1);
-        if (address_client == NULL) {
-            perror("Error malloc");
-            exit(EXIT_FAILURE);
-        }
-        sprintf(address_client, "New connection n° %d from: %s\n", ++i, inet_ntoa(info_client.sin_addr));
-        if (write(STDOUT_FILENO, address_client, strlen(address_client)) < strlen(address_client)) {
-            perror("Error write");
-            exit(EXIT_FAILURE);
-        }
         if ((child = fork()) == -1) {
             perror("Error fork");
             exit(EXIT_FAILURE);
@@ -95,6 +84,8 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
             }
             nbytes = read(client, param, BUFSIZE);
+            write(STDOUT_FILENO, param, strlen(param));
+            write(STDOUT_FILENO, "\n", 1);
             if (nbytes == -1) {
                 perror("Error read");
                 exit(EXIT_FAILURE);
@@ -129,7 +120,6 @@ int main(int argc, char *argv[]) {
             free(param);
             _exit(EXIT_SUCCESS);
         } 
-        free(address_client);
         /* Processo padre */
         if (close(client) == -1) {
             perror("Error close");
