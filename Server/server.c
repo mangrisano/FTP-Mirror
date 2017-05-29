@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
     ssize_t nbytes;
     socklen_t address_client_len = sizeof(info_client);
     int i = 0;
-    if (argc < 2) {
+    if (argc < 3) {
         perror("Error arguments");
         exit(EXIT_FAILURE);
     }
@@ -90,6 +90,7 @@ int main(int argc, char *argv[]) {
             if (nbytes == 0) {
                 if (write(STDERR_FILENO, "Client has sent an invalid command!\n", 36) < 36) {
                     perror("Error write");
+                    exit(EXIT_FAILURE);
                 }
                 exit(EXIT_FAILURE);
             }
@@ -109,6 +110,8 @@ int main(int argc, char *argv[]) {
                     perror("Error write");
                     exit(EXIT_FAILURE);
                 }
+                get(client, argv[2], param); 
+
             }
             else if (strcmp(command, "Put") == 0) {
                 if (write(STDOUT_FILENO, "Put received...\n", 16) < 16) {
@@ -135,3 +138,42 @@ int main(int argc, char *argv[]) {
     }
     exit(EXIT_SUCCESS);
 }
+
+void get(int fd, char *filedir, char *filename) {
+    DIR *dp;
+    int found = 0;
+    struct dirent *dc;
+    struct stat buf;
+    dp = opendir(filedir);
+    if (dp == NULL) {
+        perror("Error opendir");
+        exit(EXIT_FAILURE);
+    }
+    while ((dc = readdir(dp)) != NULL) {
+        if (strcmp(dc->d_name, filename) == 0) {
+            found = 1;
+            if (write(fd, &found, sizeof(found)) < sizeof(found)) {
+                perror("Error write");
+                exit(EXIT_FAILURE);
+            }
+            if (stat(dc->d_name, &buf) == -1) {
+                perror("Error stat");
+                exit(EXIT_FAILURE);
+            }
+            if (S_ISREG(buf.st_mode)) {
+                if (write(fd, "REG\n", 4) < 4) {
+                    perror("Error write");
+                    exit(EXIT_FAILURE);
+                }
+            }
+            exit(EXIT_SUCCESS);
+        }
+    }
+    if (closedir(dp) == -1) {
+        perror("Error close");
+        exit(EXIT_FAILURE);
+    }
+}
+                
+
+
