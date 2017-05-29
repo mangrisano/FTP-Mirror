@@ -144,6 +144,9 @@ void get(int fd, char *filedir, char *filename) {
     int found = 0;
     struct dirent *dc;
     struct stat buf;
+    int f;
+    ssize_t nbytes;
+    char *f_content;
     dp = opendir(filedir);
     if (dp == NULL) {
         perror("Error opendir");
@@ -161,10 +164,35 @@ void get(int fd, char *filedir, char *filename) {
                 exit(EXIT_FAILURE);
             }
             if (S_ISREG(buf.st_mode)) {
-                if (write(fd, "REG\n", 4) < 4) {
+                if (write(fd, "REG", 3) < 3) {
                     perror("Error write");
                     exit(EXIT_FAILURE);
                 }
+                f = open(dc->d_name, O_RDONLY);
+                if (f == -1) {
+                    perror("Error open file");
+                    exit(EXIT_FAILURE);
+                }
+                f_content = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+                if (f_content == NULL) {
+                    perror("Error malloc");
+                    exit(EXIT_FAILURE);
+                }
+                nbytes = read(f, f_content, BUFSIZE);
+                if (nbytes == -1) {
+                    perror("Error read");
+                    exit(EXIT_FAILURE);
+                }
+                if (nbytes == 0) {
+                    perror("No more bytes\n");
+                    exit(EXIT_SUCCESS);
+                }
+                write(fd, f_content, nbytes);
+                if (close(f) == -1) {
+                    perror("Error closing file");
+                    exit(EXIT_FAILURE);
+                }
+                free(f_content);
             }
             exit(EXIT_SUCCESS);
         }
