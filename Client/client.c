@@ -13,7 +13,9 @@
 int main(int argc, char *argv[]) {
     struct sockaddr_in info_server;
     int server;
-    char *command, *params;
+    char *command, *params, type[4];
+    int found;
+    ssize_t nbytes;
     const char *error = "Command not found!\n";
     info_server.sin_family = AF_INET;
     info_server.sin_port = htons(5200);
@@ -40,18 +42,53 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     if ((strcmp(command, "Get") == 0) || (strcmp(command, "Put") == 0)) {         
-        write(server, command, strlen(command));
-        write(server, params, strlen(params));
+        if (write(server, command, strlen(command)) < strlen(command)) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
+        }
+        if (write(server, params, strlen(params)) < strlen(params)) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
+        }
     }
     else if (strcmp(command, "List") == 0) {
-            write(server, command, strlen(command) - 1);
-            write(server, params, strlen(params));
-        }
+            if (write(server, command, strlen(command) - 1) < strlen(command) - 1) {
+                perror("Error write");
+                exit(EXIT_FAILURE);
+            }
+            if (write(server, params, strlen(params)) < strlen(params)) {
+                perror("Error write");
+                exit(EXIT_FAILURE);
+            }
+    }
     else {
         if (write(STDERR_FILENO, error, strlen(error)) < strlen(error)) {
             perror("Error write");
             exit(EXIT_FAILURE);
         }
+        exit(EXIT_FAILURE);
+    }
+    read(server, &found, sizeof(found));
+    if (found == 1) {
+        if (write(STDOUT_FILENO, "Found\n", 6) < 6) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
+        }
+        nbytes = read(server, type, 4);
+        if (nbytes == -1) {
+            perror("Error read");
+            exit(EXIT_FAILURE);
+        }
+        if (nbytes == 0) {
+            exit(EXIT_SUCCESS);
+        }
+        if (write(STDOUT_FILENO, type, strlen(type)) < strlen(type)) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
+        }
+    }
+    else {
+        write(STDOUT_FILENO, "no\n", 3);
     }
     free(command);
     free(params);
