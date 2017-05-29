@@ -11,7 +11,7 @@
 #include <sys/stat.h>
 
 #define BUFSIZE 1024
-#define PENDING_QUEUE 3
+#define PENDING_QUEUE 5
 
 void get(int fd, char *filedir, char *filename);
 void put(int fd, char *filename);
