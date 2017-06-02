@@ -11,19 +11,23 @@
 #define BUFSIZE 1024
 
 int main(int argc, char *argv[]) {
-    struct sockaddr_in info_server;
-    int server, port;
+    struct sockaddr_in info_server;             /* Connections informations */
+    int server, port;                           /* Server params */
     char *command, *params, type[3];
-    int found, f;
-    char *f_content, *filename;
-    ssize_t nbytes;
+    int found = 0;                              /* 1 if filename is found; 0 otherwise */
+    int f;                                      /* Filedescritor for the file that has to be creat */
     int i;
+    char *f_content;                            /* Content of the file */
+    char *filename;
+    size_t lenfilename = 0;
+    ssize_t nbytes;                             /* Num of bytes read */
     const char *error = "Command not found!\n";
     if (argc < 4) {
         perror("Error arguments");
         exit(EXIT_FAILURE);
     }
     sscanf(argv[3], "%d", &port);
+    /* Set server's params */
     info_server.sin_family = AF_INET;
     info_server.sin_port = htons(port);
     inet_aton("127.0.0.1", &info_server.sin_addr);
@@ -44,6 +48,7 @@ int main(int argc, char *argv[]) {
     }
     strcpy(command, argv[1]);
     strcpy(params, argv[2]);
+    /* Connection to the server */
     if (connect(server, (struct sockaddr *) &info_server, sizeof(struct sockaddr_in)) == -1) {
         perror("Error connect");
         exit(EXIT_FAILURE);
@@ -85,12 +90,14 @@ int main(int argc, char *argv[]) {
         if (nbytes == 0) {
             exit(EXIT_SUCCESS);
         }
+        /* Check the type of the file */
         if (strcmp(type, "REG") == 0) {
             f_content = (char *) malloc(sizeof(char) * BUFSIZE + 1);
             if (f_content == NULL) {
                 perror("Error malloc");
                 exit(EXIT_FAILURE);
             }
+            /* Create the file if doesn't exist in write-only */
             f = open(params, O_CREAT | O_WRONLY, 0644);
             if (f == -1) {
                 perror("Error open");
@@ -113,22 +120,34 @@ int main(int argc, char *argv[]) {
                 perror("Error write");
                 exit(EXIT_FAILURE);
             }
+            /* Free the memory */
             free(f_content);
             if (close(f) == -1) {
                 perror("Error closing file");
                 exit(EXIT_FAILURE);
             }
         }
-        if (strcmp(type, "DIR") == 0) {
+        /* Check the type of the file */
+        else if (strcmp(type, "DIR") == 0) {
             for (i = 0; i < 3; i++) {
                 filename = (char *) malloc(sizeof(char) * BUFSIZE + 1);
                 if (filename == NULL) {
                     perror("Error malloc");
                     exit(EXIT_FAILURE);
                 }
-                nbytes = read(server, filename, BUFSIZE);
+                /* Read the right length of the filename */
+                nbytes = read(server, &lenfilename, sizeof(lenfilename));
                 if (nbytes == -1) {
                     perror("Error read");
+                    exit(EXIT_FAILURE);
+                }
+                if (nbytes == 0) {
+                    exit(EXIT_SUCCESS);
+                }
+                /* Read the filename */
+                nbytes = read(server, filename, lenfilename);
+                if (nbytes == -1) {
+                    perror("Error read dd");
                     exit(EXIT_FAILURE);
                 }
                 if (nbytes == 0) {
@@ -143,6 +162,7 @@ int main(int argc, char *argv[]) {
     else {
         write(STDOUT_FILENO, "File not found!\n", 16);
     }
+    /* Free the memory */
     free(command);
     free(params);
     exit(EXIT_SUCCESS);
