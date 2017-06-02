@@ -12,18 +12,20 @@
 
 int main(int argc, char *argv[]) {
     struct sockaddr_in info_server;
-    int server;
+    int server, port;
     char *command, *params, type[3];
     int found, f;
-    char *f_content;
+    char *f_content, *filename;
     ssize_t nbytes;
+    int i;
     const char *error = "Command not found!\n";
-    if (argc < 3) {
+    if (argc < 4) {
         perror("Error arguments");
         exit(EXIT_FAILURE);
     }
+    sscanf(argv[3], "%d", &port);
     info_server.sin_family = AF_INET;
-    info_server.sin_port = htons(5200);
+    info_server.sin_port = htons(port);
     inet_aton("127.0.0.1", &info_server.sin_addr);
     server = socket(PF_INET, SOCK_STREAM, 0);
     if (server == -1) {
@@ -89,7 +91,7 @@ int main(int argc, char *argv[]) {
                 perror("Error malloc");
                 exit(EXIT_FAILURE);
             }
-            f = open(params, O_CREAT | O_RDWR, 0644);
+            f = open(params, O_CREAT | O_WRONLY, 0644);
             if (f == -1) {
                 perror("Error open");
                 exit(EXIT_FAILURE);
@@ -115,6 +117,26 @@ int main(int argc, char *argv[]) {
             if (close(f) == -1) {
                 perror("Error closing file");
                 exit(EXIT_FAILURE);
+            }
+        }
+        if (strcmp(type, "DIR") == 0) {
+            for (i = 0; i < 3; i++) {
+                filename = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+                if (filename == NULL) {
+                    perror("Error malloc");
+                    exit(EXIT_FAILURE);
+                }
+                nbytes = read(server, filename, BUFSIZE);
+                if (nbytes == -1) {
+                    perror("Error read");
+                    exit(EXIT_FAILURE);
+                }
+                if (nbytes == 0) {
+                    exit(EXIT_SUCCESS);
+                }
+                write(STDOUT_FILENO, filename, nbytes);
+                write(STDOUT_FILENO, "\n", 1);
+                free(filename);
             }
         }
     }
