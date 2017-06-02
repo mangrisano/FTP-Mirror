@@ -131,10 +131,10 @@ void get(int fd, char *filedir, char *filename) {
     DIR *dp;                                        /* dp is for directory parent */
     DIR *dc;                                        /* dc is for directoy child */
     struct dirent *de;                              /* de is for directory entry */
-    struct stat buf;
+    struct stat buf;                                /* buf contains the file's informations */
     int found = 0;                                  /* True if filename is found; 1 otherwise */
     size_t lenfname = 0;                            /* Length of the filename */
-    int f;
+    int f;                                          /* Filedescriptor for the file that has to be read */
     ssize_t nbytes;                                 /* Num of bytes read */
     char *f_content;                                /* Content of the file */
     char *fname;                                    /* Name of the file */
