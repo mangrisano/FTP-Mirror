@@ -37,15 +37,18 @@ int main(int argc, char *argv[]) {
         perror("Error socket");
         exit(EXIT_FAILURE);
     }
+    /* Bind the address to the service */
     if (bind(server, (struct sockaddr *) &info_server, sizeof(struct sockaddr_in)) == -1) {
         perror("Error bind");
         exit(EXIT_FAILURE);
     }
+    /* Keep the socket in listening */
     if (listen(server, PENDING_QUEUE) == -1) {
         perror("Error listen");
         exit(EXIT_FAILURE);
     }
     for (;;) {
+        /* Accept for incoming connections */
         client = accept(server, (struct sockaddr *) &info_client, &address_client_len);
         if (client == -1) {
             perror("Error accept");
@@ -61,7 +64,7 @@ int main(int argc, char *argv[]) {
                 perror("Error close");
                 exit(EXIT_FAILURE);
             }
-            command = (char *) malloc(sizeof(char) * 4);
+            command = (char *) malloc(sizeof(char) * 3);
             if (command == NULL) {
                 perror("Error malloc");
                 exit(EXIT_FAILURE);
@@ -95,8 +98,7 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
             }
             if (strcmp(command, "Get") == 0) {
-                get(client, argv[2], param); 
-
+                get(client, argv[2], param);
             }
             else if (strcmp(command, "Put") == 0) {
                 if (write(STDOUT_FILENO, "Put received...\n", 16) < 16) {
@@ -126,13 +128,15 @@ int main(int argc, char *argv[]) {
 }
 
 void get(int fd, char *filedir, char *filename) {
-    DIR *dp;
-    int found = 0;
+    DIR *dp;    
     struct dirent *dc;
     struct stat buf;
+    int found = 0; /* True if filename is found; 1 otherwise */
+    size_t lenfname = 0; /* Length of the filename */
     int f;
     ssize_t nbytes;
-    char *f_content;
+    char *f_content; /* Content of the file */
+    char *fname; /* Name of the file */
     dp = opendir(filedir);
     if (dp == NULL) {
         perror("Error opendir");
@@ -155,16 +159,19 @@ void get(int fd, char *filedir, char *filename) {
                     perror("Error write");
                     exit(EXIT_FAILURE);
                 }
+                /* Open the file with READONLY permissions */
                 f = open(dc->d_name, O_RDONLY);
                 if (f == -1) {
                     perror("Error open file");
                     exit(EXIT_FAILURE);
                 }
+                /* Malloc the space for the content of the file */
                 f_content = (char *) malloc(sizeof(char) * BUFSIZE + 1);
                 if (f_content == NULL) {
                     perror("Error malloc");
                     exit(EXIT_FAILURE);
                 }
+                /* Read the content of the file */
                 nbytes = read(f, f_content, BUFSIZE);
                 if (nbytes == -1) {
                     perror("Error read");
@@ -174,11 +181,13 @@ void get(int fd, char *filedir, char *filename) {
                     perror("No more bytes\n");
                     exit(EXIT_SUCCESS);
                 }
+                /* Send the content to the fd */
                 write(fd, f_content, nbytes);
                 if (close(f) == -1) {
                     perror("Error closing file");
                     exit(EXIT_FAILURE);
                 }
+                /* Free the space */
                 free(f_content);
             }
             /* If the param of the client is a directory */
@@ -188,19 +197,34 @@ void get(int fd, char *filedir, char *filename) {
                         perror("Error write");
                         exit(EXIT_FAILURE);
                     }
+                    /* Change the directory */
                     chdir(filename);
                     dp = opendir(".");
+                    /* Read the directory */
                     while ((dc = readdir(dp)) != NULL) {
                         if ((strcmp(dc->d_name, ".") == 0) || (strcmp(dc->d_name, "..") == 0)) {
                             continue;
                         }
-                        write(STDOUT_FILENO, dc->d_name, strlen(dc->d_name));
-                        write(STDOUT_FILENO, "\n", 1);
-                        if (write(fd, dc->d_name, strlen(dc->d_name)) < strlen(dc->d_name)) {
+                        /* Malloc the space for the filename and check */
+                        fname = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+                        if (fname == NULL) {
+                            perror("Error malloc");
+                            exit(EXIT_FAILURE);
+                        }
+                        /* Copy the name of the file in fname */
+                        strcpy(fname, dc->d_name);
+                        lenfname = strlen(fname);
+                        /* Send to the client the length of the filename */
+                        write(fd, &lenfname, sizeof(lenfname));
+                        /* Send to the client the filename */
+                        if (write(fd, fname, lenfname) < lenfname) {
                             perror("Error write");
                             exit(EXIT_FAILURE);
                         }
+                        /* Free the space */
+                        free(fname);
                     }
+                    /* Close the directory */
                     if (closedir(dp) == -1) {
                         perror("Error closedir");
                         exit(EXIT_FAILURE);
