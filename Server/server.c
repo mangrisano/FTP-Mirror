@@ -29,6 +29,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     sscanf(argv[1], "%d", &port);
+    /* Set server's params */
     info_server.sin_family = AF_INET;
     info_server.sin_port = htons(port);
     info_server.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -132,7 +133,7 @@ void get(int fd, char *filedir, char *filename) {
     DIR *dc;                                        /* dc is for directoy child */
     struct dirent *de;                              /* de is for directory entry */
     struct stat buf;                                /* buf contains the file's informations */
-    int found = 0;                                  /* True if filename is found; 1 otherwise */
+    int found = 0;                                  /* 1 if filename is found; 0 otherwise */
     size_t lenfname = 0;                            /* Length of the filename */
     int f;                                          /* Filedescriptor for the file that has to be read */
     ssize_t nbytes;                                 /* Num of bytes read */
