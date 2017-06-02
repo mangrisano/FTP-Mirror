@@ -18,11 +18,11 @@ void put(int fd, char *filename);
 void list(int fd, char *filename);
 
 int main(int argc, char *argv[]) {
-    struct sockaddr_in info_server, info_client;
+    struct sockaddr_in info_server, info_client;        /* Connections informations */
     int server, port, client;
     pid_t child;
-    char *command, *param;
-    ssize_t nbytes;
+    char *command, *param;                              /* Command and param received from the client */
+    ssize_t nbytes;                                     /* Num of bytes read */
     socklen_t address_client_len = sizeof(info_client);
     if (argc < 3) {
         perror("Error arguments");
@@ -128,28 +128,29 @@ int main(int argc, char *argv[]) {
 }
 
 void get(int fd, char *filedir, char *filename) {
-    DIR *dp;    
-    struct dirent *dc;
+    DIR *dp;                                        /* dp is for directory parent */
+    DIR *dc;                                        /* dc is for directoy child */
+    struct dirent *de;                              /* de is for directory entry */
     struct stat buf;
-    int found = 0; /* True if filename is found; 1 otherwise */
-    size_t lenfname = 0; /* Length of the filename */
+    int found = 0;                                  /* True if filename is found; 1 otherwise */
+    size_t lenfname = 0;                            /* Length of the filename */
     int f;
-    ssize_t nbytes;
-    char *f_content; /* Content of the file */
-    char *fname; /* Name of the file */
+    ssize_t nbytes;                                 /* Num of bytes read */
+    char *f_content;                                /* Content of the file */
+    char *fname;                                    /* Name of the file */
     dp = opendir(filedir);
     if (dp == NULL) {
         perror("Error opendir");
         exit(EXIT_FAILURE);
     }
-    while ((dc = readdir(dp)) != NULL) {
-        if (strcmp(dc->d_name, filename) == 0) {
+    while ((de = readdir(dp)) != NULL) {
+        if (strcmp(de->d_name, filename) == 0) {
             found = 1;
             if (write(fd, &found, sizeof(found)) < sizeof(found)) {
                 perror("Error write");
                 exit(EXIT_FAILURE);
             }
-            if (stat(dc->d_name, &buf) == -1) {
+            if (stat(de->d_name, &buf) == -1) {
                 perror("Error stat");
                 exit(EXIT_FAILURE);
             }
@@ -160,7 +161,7 @@ void get(int fd, char *filedir, char *filename) {
                     exit(EXIT_FAILURE);
                 }
                 /* Open the file with READONLY permissions */
-                f = open(dc->d_name, O_RDONLY);
+                f = open(de->d_name, O_RDONLY);
                 if (f == -1) {
                     perror("Error open file");
                     exit(EXIT_FAILURE);
@@ -199,10 +200,10 @@ void get(int fd, char *filedir, char *filename) {
                     }
                     /* Change the directory */
                     chdir(filename);
-                    dp = opendir(".");
+                    dc = opendir(".");
                     /* Read the directory */
-                    while ((dc = readdir(dp)) != NULL) {
-                        if ((strcmp(dc->d_name, ".") == 0) || (strcmp(dc->d_name, "..") == 0)) {
+                    while ((de = readdir(dc)) != NULL) {
+                        if ((strcmp(de->d_name, ".") == 0) || (strcmp(de->d_name, "..") == 0)) {
                             continue;
                         }
                         /* Malloc the space for the filename and check */
@@ -212,7 +213,7 @@ void get(int fd, char *filedir, char *filename) {
                             exit(EXIT_FAILURE);
                         }
                         /* Copy the name of the file in fname */
-                        strcpy(fname, dc->d_name);
+                        strcpy(fname, de->d_name);
                         lenfname = strlen(fname);
                         /* Send to the client the length of the filename */
                         write(fd, &lenfname, sizeof(lenfname));
@@ -224,8 +225,8 @@ void get(int fd, char *filedir, char *filename) {
                         /* Free the space */
                         free(fname);
                     }
-                    /* Close the directory */
-                    if (closedir(dp) == -1) {
+                    /* Close the directory child */
+                    if (closedir(dc) == -1) {
                         perror("Error closedir");
                         exit(EXIT_FAILURE);
                     }
@@ -233,6 +234,7 @@ void get(int fd, char *filedir, char *filename) {
             }
         }
     }
+    /* Close the directory parent */
     if (closedir(dp) == -1) {
         perror("Error close");
         exit(EXIT_FAILURE);
