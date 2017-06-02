@@ -55,10 +55,10 @@ int main(int argc, char *argv[]) {
             perror("Error fork");
             exit(EXIT_FAILURE);
         }
-        /* Processo figlio */
+        /* Child process */
         if (child == 0) { 
-            if (close(server) == -1) { /* Chiudo il file descriptor del socket */ 
-                perror("Error close"); /* in listening non più utilizzato */
+            if (close(server) == -1) { /* Closing unused file descriptor */ 
+                perror("Error close");
                 exit(EXIT_FAILURE);
             }
             command = (char *) malloc(sizeof(char) * 4);
@@ -84,23 +84,17 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
             }
             nbytes = read(client, param, BUFSIZE);
-            write(STDOUT_FILENO, param, strlen(param));
-            write(STDOUT_FILENO, "\n", 1);
             if (nbytes == -1) {
                 perror("Error read");
                 exit(EXIT_FAILURE);
             }
             if (nbytes == 0) {
-                if (write(STDERR_FILENO, "No bytes read!\n", 16) < 16) {
+                if (write(STDERR_FILENO, "No bytes read!\n", 15) < 15) {
                     perror("Error write");
                 }
                 exit(EXIT_FAILURE);
             }
             if (strcmp(command, "Get") == 0) {
-                if (write(STDOUT_FILENO, "Get received...\n", 16) < 16) {
-                    perror("Error write");
-                    exit(EXIT_FAILURE);
-                }
                 get(client, argv[2], param); 
 
             }
@@ -109,18 +103,20 @@ int main(int argc, char *argv[]) {
                     perror("Error write");
                     exit(EXIT_FAILURE);
                 }
+                /* Do something */
             }
             else if (strcmp(command, "Lis") == 0) {
                 if (write(STDOUT_FILENO, "List received...\n", 17) < 17) {
                     perror("Error write");
                     exit(EXIT_FAILURE);
                 }
+                /* Do something */
             }
             free(command);
             free(param);
             _exit(EXIT_SUCCESS);
         } 
-        /* Processo padre */
+        /* Parent process */
         if (close(client) == -1) {
             perror("Error close");
             exit(EXIT_FAILURE);
@@ -153,6 +149,7 @@ void get(int fd, char *filedir, char *filename) {
                 perror("Error stat");
                 exit(EXIT_FAILURE);
             }
+            /* If the param of the client is a regular file */
             if (S_ISREG(buf.st_mode)) {
                 if (write(fd, "REG", 3) < 3) {
                     perror("Error write");
@@ -184,14 +181,37 @@ void get(int fd, char *filedir, char *filename) {
                 }
                 free(f_content);
             }
-            exit(EXIT_SUCCESS);
+            /* If the param of the client is a directory */
+            else {
+                if (S_ISDIR(buf.st_mode)) {
+                    if (write(fd, "DIR", 3) < 3) {
+                        perror("Error write");
+                        exit(EXIT_FAILURE);
+                    }
+                    chdir(filename);
+                    dp = opendir(".");
+                    while ((dc = readdir(dp)) != NULL) {
+                        if ((strcmp(dc->d_name, ".") == 0) || (strcmp(dc->d_name, "..") == 0)) {
+                            continue;
+                        }
+                        write(STDOUT_FILENO, dc->d_name, strlen(dc->d_name));
+                        write(STDOUT_FILENO, "\n", 1);
+                        if (write(fd, dc->d_name, strlen(dc->d_name)) < strlen(dc->d_name)) {
+                            perror("Error write");
+                            exit(EXIT_FAILURE);
+                        }
+                    }
+                    if (closedir(dp) == -1) {
+                        perror("Error closedir");
+                        exit(EXIT_FAILURE);
+                    }
+                }
+            }
         }
     }
     if (closedir(dp) == -1) {
         perror("Error close");
         exit(EXIT_FAILURE);
     }
+    exit(EXIT_SUCCESS);
 }
-                
-
-
