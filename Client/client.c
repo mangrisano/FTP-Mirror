@@ -103,6 +103,7 @@ int main(int argc, char *argv[]) {
                 perror("Error open");
                 exit(EXIT_FAILURE);
             }
+            /* Read the content of the file */
             nbytes = read(server, f_content, BUFSIZE);
             if (nbytes == -1) {
                 perror("Error read");
@@ -155,6 +156,7 @@ int main(int argc, char *argv[]) {
                 }
                 write(STDOUT_FILENO, filename, nbytes);
                 write(STDOUT_FILENO, "\n", 1);
+                /* Free the memory */
                 free(filename);
             }
         }
