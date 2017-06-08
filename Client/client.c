@@ -20,6 +20,7 @@ int main(int argc, char *argv[]) {
     char *f_content;                            /* Content of the file */
     char *filename;
     size_t lenfilename = 0;
+    size_t lenfcontent = 0;
     ssize_t nbytes;                             /* Num of bytes read */
     const char *error = "Command not found!\n";
     if (argc < 4) {
@@ -135,6 +136,11 @@ int main(int argc, char *argv[]) {
                 if (filename == NULL) {
                     perror("Error malloc");
                     exit(EXIT_FAILURE);
+                }                
+                f_content = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+                if (f_content == NULL) {
+                    perror("Error malloc");
+                    exit(EXIT_FAILURE);
                 }
                 /* Read the right length of the filename */
                 nbytes = read(server, &lenfilename, sizeof(lenfilename));
@@ -148,16 +154,46 @@ int main(int argc, char *argv[]) {
                 /* Read the filename */
                 nbytes = read(server, filename, lenfilename);
                 if (nbytes == -1) {
-                    perror("Error read dd");
+                    perror("Error read filename");
                     exit(EXIT_FAILURE);
                 }
                 if (nbytes == 0) {
                     exit(EXIT_SUCCESS);
                 }
-                write(STDOUT_FILENO, filename, nbytes);
+                f = open(filename, O_CREAT | O_WRONLY, 0644);
+                if (f == -1) {
+                    perror("Error open file");
+                    exit(EXIT_FAILURE);
+                }
+                nbytes = read(server, &lenfcontent, sizeof(lenfcontent));
+                if (nbytes == -1) {
+                    perror("Error read");
+                    exit(EXIT_FAILURE);
+                }
+                if (nbytes == 0) {
+                    exit(EXIT_SUCCESS);
+                }
+                nbytes = read(server, f_content, lenfcontent);
+                if (nbytes == -1) {
+                    perror("Error read file content");
+                    exit(EXIT_FAILURE);
+                }
+                if (nbytes == 0) {
+                    exit(EXIT_SUCCESS);
+                }
+                if (write(f, f_content, nbytes) < nbytes) {
+                    perror("Error write");
+                    exit(EXIT_FAILURE);
+                }
+                write(STDOUT_FILENO, filename, strlen(filename));
                 write(STDOUT_FILENO, "\n", 1);
                 /* Free the memory */
+                free(f_content);
                 free(filename);
+                if (close(f) == -1) {
+                    perror("Error close file");
+                    exit(EXIT_FAILURE);
+                }
             }
         }
     }
