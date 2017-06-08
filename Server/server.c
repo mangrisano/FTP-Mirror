@@ -10,7 +10,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#define BUFSIZE 1024
+#define BUFSIZE 4096
 #define PENDING_QUEUE 5
 
 void get(int fd, char *filedir, char *filename);
@@ -18,11 +18,11 @@ void put(int fd, char *filename);
 void list(int fd, char *filename);
 
 int main(int argc, char *argv[]) {
-    struct sockaddr_in info_server, info_client;        /* Connections informations */
+    struct sockaddr_in info_server, info_client;          /* Connections informations */
     int server, port, client;
     pid_t child;
-    char *command, *param;                              /* Command and param received from the client */
-    ssize_t nbytes;                                     /* Num of bytes read */
+    char command[4], *param;                              /* Command and param received from the client */
+    ssize_t nbytes;                                       /* Num of bytes read */
     socklen_t address_client_len = sizeof(info_client);
     if (argc < 3) {
         perror("Error arguments");
@@ -65,11 +65,6 @@ int main(int argc, char *argv[]) {
                 perror("Error close");
                 exit(EXIT_FAILURE);
             }
-            command = (char *) malloc(sizeof(char) * 3);
-            if (command == NULL) {
-                perror("Error malloc");
-                exit(EXIT_FAILURE);
-            }
             param = (char *) malloc(sizeof(char) * BUFSIZE + 1);
             if (param == NULL) {
                 perror("Error malloc");
@@ -87,6 +82,7 @@ int main(int argc, char *argv[]) {
                 }
                 exit(EXIT_FAILURE);
             }
+            command[nbytes] = '\0';
             nbytes = read(client, param, BUFSIZE);
             if (nbytes == -1) {
                 perror("Error read");
@@ -98,6 +94,7 @@ int main(int argc, char *argv[]) {
                 }
                 exit(EXIT_FAILURE);
             }
+            param[nbytes] = '\0';
             if (strcmp(command, "Get") == 0) {
                 get(client, argv[2], param);
             }
@@ -115,7 +112,6 @@ int main(int argc, char *argv[]) {
                 }
                 /* Do something */
             }
-            free(command);
             free(param);
             _exit(EXIT_SUCCESS);
         } 
@@ -162,6 +158,7 @@ void get(int fd, char *filedir, char *filename) {
                     perror("Error write");
                     exit(EXIT_FAILURE);
                 }
+                lenfcontent = buf.st_size;
                 /* Open the file with READONLY permissions */
                 f = open(de->d_name, O_RDONLY);
                 if (f == -1) {
@@ -173,6 +170,10 @@ void get(int fd, char *filedir, char *filename) {
                 if (f_content == NULL) {
                     perror("Error malloc");
                     exit(EXIT_FAILURE);
+                }
+                if (write(fd, &lenfcontent, sizeof(lenfcontent)) < sizeof(lenfcontent)) {
+                    perror("Error write");
+                    exit(EXIT_SUCCESS);
                 }
                 /* Read the content of the file */
                 nbytes = read(f, f_content, BUFSIZE);
@@ -257,10 +258,17 @@ void get(int fd, char *filedir, char *filename) {
                             if (nbytes == 0) {
                                 exit(EXIT_SUCCESS);
                             }
-                            if (write(fd, f_content, nbytes) < nbytes) {
+                            while (write(fd, f_content, nbytes) < nbytes) {
                                 perror("Error write");
                                 exit(EXIT_FAILURE);
                             }
+                            /* while ((nbytes = read(f, f_content, 100)) != 0) {
+                                if (write(fd, f_content, 100) < 100) {
+                                    perror("Error write");
+                                    exit(EXIT_FAILURE);
+                                }
+                                sleep(1);
+                            } */
                             /* Close the file */
                             if (close(f) == -1) {
                                 perror("Error close file");
