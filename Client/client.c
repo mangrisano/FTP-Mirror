@@ -13,7 +13,7 @@
 int main(int argc, char *argv[]) {
     struct sockaddr_in info_server;             /* Connections informations */
     int server, port;                           /* Server params */
-    char *command, *params, type[3];
+    char command[4], *params, type[3];
     int found = 0;                              /* 1 if filename is found; 0 otherwise */
     int f;                                      /* Filedescritor for the file that has to be creat */
     int i;
@@ -37,11 +37,6 @@ int main(int argc, char *argv[]) {
         perror("Error socket");
         exit(EXIT_FAILURE);
     }
-    command = (char *) malloc(sizeof(char) * BUFSIZE + 1);
-    if (command == NULL) {
-        perror("Error malloc");
-        exit(EXIT_FAILURE);
-    }
     params = (char *) malloc(sizeof(char) * BUFSIZE + 1);
     if (params == NULL) {
         perror("Error malloc");
@@ -54,7 +49,7 @@ int main(int argc, char *argv[]) {
         perror("Error connect");
         exit(EXIT_FAILURE);
     }
-    if ((strcmp(command, "Get") == 0) || (strcmp(command, "Put") == 0)) {         
+    if ((strcmp(command, "Get") == 0) || (strcmp(command, "Put") == 0)) {
         if (write(server, command, strlen(command)) < strlen(command)) {
             perror("Error write");
             exit(EXIT_FAILURE);
@@ -104,8 +99,16 @@ int main(int argc, char *argv[]) {
                 perror("Error open");
                 exit(EXIT_FAILURE);
             }
+            nbytes = read(server, &lenfcontent, sizeof(lenfcontent));
+            if (nbytes == -1) {
+                perror("Error read");
+                exit(EXIT_FAILURE);
+            }
+            if (nbytes == 0) {
+                exit(EXIT_SUCCESS);
+            }
             /* Read the content of the file */
-            nbytes = read(server, f_content, BUFSIZE);
+            nbytes = read(server, f_content, lenfcontent);
             if (nbytes == -1) {
                 perror("Error read");
                 exit(EXIT_FAILURE);
@@ -114,7 +117,7 @@ int main(int argc, char *argv[]) {
                 perror("No more bytes");
                 exit(EXIT_SUCCESS);
             }
-            if (write(f, f_content, nbytes) < nbytes) {
+            if (write(f, f_content, lenfcontent) < lenfcontent) {
                 perror("Error write");
                 exit(EXIT_SUCCESS);
             }
@@ -160,7 +163,7 @@ int main(int argc, char *argv[]) {
                 if (nbytes == 0) {
                     exit(EXIT_SUCCESS);
                 }
-                f = open(filename, O_CREAT | O_WRONLY, 0644);
+                f = open(filename, O_CREAT | O_APPEND | O_WRONLY, 0644);
                 if (f == -1) {
                     perror("Error open file");
                     exit(EXIT_FAILURE);
@@ -185,6 +188,16 @@ int main(int argc, char *argv[]) {
                     perror("Error write");
                     exit(EXIT_FAILURE);
                 }
+                /* while ((nbytes = read(server, f_content, 100)) != 0) {
+                    if (nbytes == -1) {
+                        perror("Error read file content");
+                        exit(EXIT_FAILURE);
+                    }
+                    if (write(f, f_content, 100) < 100) {
+                        perror("Error write file content");
+                        exit(EXIT_FAILURE);
+                    }
+                } */
                 write(STDOUT_FILENO, filename, strlen(filename));
                 write(STDOUT_FILENO, "\n", 1);
                 /* Free the memory */
@@ -201,7 +214,6 @@ int main(int argc, char *argv[]) {
         write(STDOUT_FILENO, "File not found!\n", 16);
     }
     /* Free the memory */
-    free(command);
     free(params);
     exit(EXIT_SUCCESS);
 }
