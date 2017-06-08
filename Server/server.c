@@ -70,6 +70,7 @@ int main(int argc, char *argv[]) {
                 perror("Error malloc");
                 exit(EXIT_FAILURE);
             }
+            /* Command received from the client */
             nbytes = read(client, command, 3);
             if (nbytes == -1) {
                 perror("Error read");
@@ -83,6 +84,7 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
             }
             command[nbytes] = '\0';
+            /* Param received from the client */
             nbytes = read(client, param, BUFSIZE);
             if (nbytes == -1) {
                 perror("Error read");
@@ -112,6 +114,7 @@ int main(int argc, char *argv[]) {
                 }
                 /* Do something */
             }
+            /* Free memory */
             free(param);
             _exit(EXIT_SUCCESS);
         } 
@@ -227,6 +230,10 @@ void get(int fd, char *filedir, char *filename) {
                                 exit(EXIT_FAILURE);
                             }
                             /* Copy the name of the file in fname */
+                            if (strlen(fname) >= BUFSIZE) {
+                                perror("Error: the length of the filename is too big. Memory leak");
+                                exit(EXIT_FAILURE);
+                            }
                             strcpy(fname, de->d_name);
                             lenfname = strlen(fname);
                             /* Send to the client the length of the filename */
@@ -274,7 +281,7 @@ void get(int fd, char *filedir, char *filename) {
                                 perror("Error close file");
                                 exit(EXIT_FAILURE);
                             }
-                            /* Free the space */
+                            /* Free memory */
                             free(f_content);
                             free(fname);
                         }
