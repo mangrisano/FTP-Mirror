@@ -13,7 +13,7 @@
 int main(int argc, char *argv[]) {
     struct sockaddr_in info_server;             /* Connections informations */
     int server, port;                           /* Server params */
-    char command[4], *params, type[3];
+    char command[5], *params, type[3];
     int found = 0;                              /* 1 if filename is found; 0 otherwise */
     int f;                                      /* Filedescritor for the file that has to be creat */
     int i;
@@ -40,6 +40,14 @@ int main(int argc, char *argv[]) {
     params = (char *) malloc(sizeof(char) * BUFSIZE + 1);
     if (params == NULL) {
         perror("Error malloc");
+        exit(EXIT_FAILURE);
+    }
+    if (strlen(argv[1]) >= sizeof(command)) {
+        perror("Error: the length of the command is too big. Memory leak");
+        exit(EXIT_FAILURE);
+    }
+    if (strlen(argv[2]) >= BUFSIZE) {
+        perror("Error: the length of the param is too big. Memory leak");
         exit(EXIT_FAILURE);
     }
     strcpy(command, argv[1]);
@@ -76,8 +84,10 @@ int main(int argc, char *argv[]) {
         }
         exit(EXIT_FAILURE);
     }
+    /* 1 if the file is found; 0 otherwise */
     read(server, &found, sizeof(found));
     if (found == 1) {
+        /* Receive the type of the file */
         nbytes = read(server, type, 3);
         if (nbytes == -1) {
             perror("Error read");
@@ -125,7 +135,7 @@ int main(int argc, char *argv[]) {
                 perror("Error write");
                 exit(EXIT_FAILURE);
             }
-            /* Free the memory */
+            /* Free memory */
             free(f_content);
             if (close(f) == -1) {
                 perror("Error closing file");
@@ -163,7 +173,8 @@ int main(int argc, char *argv[]) {
                 if (nbytes == 0) {
                     exit(EXIT_SUCCESS);
                 }
-                f = open(filename, O_CREAT | O_APPEND | O_WRONLY, 0644);
+                /* Open the file, create if it doesn't exists */
+                f = open(filename, O_CREAT | O_WRONLY, 0644);
                 if (f == -1) {
                     perror("Error open file");
                     exit(EXIT_FAILURE);
@@ -176,6 +187,7 @@ int main(int argc, char *argv[]) {
                 if (nbytes == 0) {
                     exit(EXIT_SUCCESS);
                 }
+                /* Read the file content from the server */
                 nbytes = read(server, f_content, lenfcontent);
                 if (nbytes == -1) {
                     perror("Error read file content");
@@ -184,6 +196,7 @@ int main(int argc, char *argv[]) {
                 if (nbytes == 0) {
                     exit(EXIT_SUCCESS);
                 }
+                /* Write the content on the file */
                 if (write(f, f_content, nbytes) < nbytes) {
                     perror("Error write");
                     exit(EXIT_FAILURE);
@@ -200,7 +213,7 @@ int main(int argc, char *argv[]) {
                 } */
                 write(STDOUT_FILENO, filename, strlen(filename));
                 write(STDOUT_FILENO, "\n", 1);
-                /* Free the memory */
+                /* Free memory */
                 free(f_content);
                 free(filename);
                 if (close(f) == -1) {
