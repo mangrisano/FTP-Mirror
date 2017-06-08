@@ -135,6 +135,7 @@ void get(int fd, char *filedir, char *filename) {
     struct stat buf;                                /* buf contains the file's informations */
     int found = 0;                                  /* 1 if filename is found; 0 otherwise */
     size_t lenfname = 0;                            /* Length of the filename */
+    size_t lenfcontent = 0;
     int f;                                          /* Filedescriptor for the file that has to be read */
     ssize_t nbytes;                                 /* Num of bytes read */
     char *f_content;                                /* Content of the file */
@@ -207,24 +208,68 @@ void get(int fd, char *filedir, char *filename) {
                         if ((strcmp(de->d_name, ".") == 0) || (strcmp(de->d_name, "..") == 0)) {
                             continue;
                         }
-                        /* Malloc the space for the filename and check */
-                        fname = (char *) malloc(sizeof(char) * BUFSIZE + 1);
-                        if (fname == NULL) {
-                            perror("Error malloc");
+                        if (stat(de->d_name, &buf) == -1) {
+                            perror("Error stat");
                             exit(EXIT_FAILURE);
                         }
-                        /* Copy the name of the file in fname */
-                        strcpy(fname, de->d_name);
-                        lenfname = strlen(fname);
-                        /* Send to the client the length of the filename */
-                        write(fd, &lenfname, sizeof(lenfname));
-                        /* Send to the client the filename */
-                        if (write(fd, fname, lenfname) < lenfname) {
-                            perror("Error write");
-                            exit(EXIT_FAILURE);
+                        if (S_ISREG(buf.st_mode)) {
+                            lenfcontent = buf.st_size;
+                            /* Malloc the space for the filename and check */
+                            fname = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+                            if (fname == NULL) {
+                                perror("Error malloc");
+                                exit(EXIT_FAILURE);
+                            }                            
+                            f_content = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+                            if (f_content == NULL) {
+                                perror("Error malloc");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Copy the name of the file in fname */
+                            strcpy(fname, de->d_name);
+                            lenfname = strlen(fname);
+                            /* Send to the client the length of the filename */
+                            if (write(fd, &lenfname, sizeof(lenfname)) < sizeof(lenfname)) {
+                                perror("Error write");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Send to the client the filename */
+                            if (write(fd, fname, lenfname) < lenfname) {
+                                perror("Error write");
+                                exit(EXIT_FAILURE);
+                            }                            
+                            if (write(fd, &lenfcontent, sizeof(lenfcontent)) < sizeof(lenfcontent)) {
+                                perror("Error write");
+                                exit(EXIT_SUCCESS);
+                            }
+                            /* Open the file */
+                            f = open(fname, O_RDONLY);
+                            if (f == -1) {
+                                perror("Error open file");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Read the file content, 100 byte at once */
+                            nbytes = read(f, f_content, lenfcontent);
+                            if (nbytes == -1) {
+                                perror("Error read file content");
+                                exit(EXIT_FAILURE);
+                            }
+                            if (nbytes == 0) {
+                                exit(EXIT_SUCCESS);
+                            }
+                            if (write(fd, f_content, nbytes) < nbytes) {
+                                perror("Error write");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Close the file */
+                            if (close(f) == -1) {
+                                perror("Error close file");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Free the space */
+                            free(f_content);
+                            free(fname);
                         }
-                        /* Free the space */
-                        free(fname);
                     }
                     /* Close the directory child */
                     if (closedir(dc) == -1) {
