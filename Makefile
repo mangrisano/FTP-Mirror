@@ -7,7 +7,7 @@ client:
 	$(MAKE) -C Client
 
 
-.PHONY: clean all
+.PHONY: clean all server client
 
 clean:
 	$(MAKE) -C Server clean
