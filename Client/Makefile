@@ -1,13 +1,15 @@
 CC = gcc
-CFLAGS = -Wall -ansi -pedantic
-BINARY = client
-SOURCE = client.c
+CFLAGS = -Wall -ansi -pedantic -Wstrict-prototypes -D_DEFAULT_SOURCE
+PROG = client
+SOURCES = $(PROG).c
 
 
-$(BINARY): $(SOURCE)
-	$(CC) -o $(BINARY) $(SOURCE) $(CFLAGS)
+$(PROG): $(SOURCES)
+	$(CC) $(CFLAGS) -o $(PROG) $(SOURCES) $(LDFLAGS)
+
+
+.PHONY: clean all
 
 # Removing the binary
-
 clean:
-	rm $(BINARY)
+	$(RM) $(PROG) *~ ~.o
