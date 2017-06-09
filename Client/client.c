@@ -16,12 +16,13 @@ int main(int argc, char *argv[]) {
     char command[5], *params, type[3];
     int found = 0;                              /* 1 if filename is found; 0 otherwise */
     int f;                                      /* Filedescritor for the file that has to be creat */
-    int i;
     char *f_content;                            /* Content of the file */
     char *filename;
+    char flag = '+';                            /* Flag to set the end of transfer */
+    char flag_f = '#';                          /* Flag to say if there are more file regular */
     size_t lenfilename = 0;
-    size_t lenfcontent = 0;
     ssize_t nbytes;                             /* Num of bytes read */
+    size_t bytewr;                              /* The num of the bytes to write every time */
     const char *error = "Command not found!\n";
     if (argc < 4) {
         perror("Error arguments");
@@ -109,27 +110,38 @@ int main(int argc, char *argv[]) {
                 perror("Error open");
                 exit(EXIT_FAILURE);
             }
-            nbytes = read(server, &lenfcontent, sizeof(lenfcontent));
-            if (nbytes == -1) {
-                perror("Error read");
-                exit(EXIT_FAILURE);
-            }
-            if (nbytes == 0) {
-                exit(EXIT_SUCCESS);
-            }
             /* Read the content of the file */
-            nbytes = read(server, f_content, lenfcontent);
-            if (nbytes == -1) {
-                perror("Error read");
-                exit(EXIT_FAILURE);
-            }
-            if (nbytes == 0) {
-                perror("No more bytes");
-                exit(EXIT_SUCCESS);
-            }
-            if (write(f, f_content, lenfcontent) < lenfcontent) {
-                perror("Error write");
-                exit(EXIT_SUCCESS);
+            while ((nbytes = read(server, &flag, sizeof(flag))) != 0) {
+                if (nbytes == -1) {
+                    perror("Error read");
+                    exit(EXIT_FAILURE);
+                }
+                if (flag == '-') {                    
+                    nbytes = read(server, &bytewr, sizeof(bytewr));
+                    if (nbytes == -1) {
+                        perror("Error read");
+                        exit(EXIT_SUCCESS);
+                    }
+                    if (nbytes == 0) {
+                        exit(EXIT_FAILURE);
+                    }
+                    nbytes = read(server, f_content, bytewr);
+                    if (nbytes == -1) {
+                        perror("Error read file content");
+                        exit(EXIT_FAILURE);
+                    }
+                    if (nbytes == 0) {
+                        exit(EXIT_SUCCESS);
+                    }
+                    if (write(f, f_content, bytewr) < bytewr) {
+
+                        perror("Error write");
+                        exit(EXIT_SUCCESS);
+                    }
+                }
+                else {
+                    break;
+                }
             }
             if (write(STDOUT_FILENO, "File received with success!\n", 28) < 28) {
                 perror("Error write");
@@ -144,19 +156,8 @@ int main(int argc, char *argv[]) {
         }
         /* Check the type of the file */
         else if (strcmp(type, "DIR") == 0) {
-            for (i = 0; i < 3; i++) {
-                filename = (char *) malloc(sizeof(char) * BUFSIZE + 1);
-                if (filename == NULL) {
-                    perror("Error malloc");
-                    exit(EXIT_FAILURE);
-                }                
-                f_content = (char *) malloc(sizeof(char) * BUFSIZE + 1);
-                if (f_content == NULL) {
-                    perror("Error malloc");
-                    exit(EXIT_FAILURE);
-                }
-                /* Read the right length of the filename */
-                nbytes = read(server, &lenfilename, sizeof(lenfilename));
+            for (;;) {
+                nbytes = read(server, &flag_f, sizeof(flag_f));
                 if (nbytes == -1) {
                     perror("Error read");
                     exit(EXIT_FAILURE);
@@ -164,60 +165,91 @@ int main(int argc, char *argv[]) {
                 if (nbytes == 0) {
                     exit(EXIT_SUCCESS);
                 }
-                /* Read the filename */
-                nbytes = read(server, filename, lenfilename);
-                if (nbytes == -1) {
-                    perror("Error read filename");
-                    exit(EXIT_FAILURE);
-                }
-                if (nbytes == 0) {
-                    exit(EXIT_SUCCESS);
-                }
-                /* Open the file, create if it doesn't exists */
-                f = open(filename, O_CREAT | O_WRONLY, 0644);
-                if (f == -1) {
-                    perror("Error open file");
-                    exit(EXIT_FAILURE);
-                }
-                nbytes = read(server, &lenfcontent, sizeof(lenfcontent));
-                if (nbytes == -1) {
-                    perror("Error read");
-                    exit(EXIT_FAILURE);
-                }
-                if (nbytes == 0) {
-                    exit(EXIT_SUCCESS);
-                }
-                /* Read the file content from the server */
-                nbytes = read(server, f_content, lenfcontent);
-                if (nbytes == -1) {
-                    perror("Error read file content");
-                    exit(EXIT_FAILURE);
-                }
-                if (nbytes == 0) {
-                    exit(EXIT_SUCCESS);
-                }
-                /* Write the content on the file */
-                if (write(f, f_content, nbytes) < nbytes) {
-                    perror("Error write");
-                    exit(EXIT_FAILURE);
-                }
-                /* while ((nbytes = read(server, f_content, 100)) != 0) {
+                if (flag_f == 'f') {
+                    filename = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+                    if (filename == NULL) {
+                        perror("Error malloc");
+                        exit(EXIT_FAILURE);
+                    }                
+                    f_content = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+                    if (f_content == NULL) {
+                        perror("Error malloc");
+                        exit(EXIT_FAILURE);
+                    }
+                    /* Read the right length of the filename */
+                    nbytes = read(server, &lenfilename, sizeof(lenfilename));
                     if (nbytes == -1) {
-                        perror("Error read file content");
+                        perror("Error read");
                         exit(EXIT_FAILURE);
                     }
-                    if (write(f, f_content, 100) < 100) {
-                        perror("Error write file content");
+                    if (nbytes == 0) {
+                        exit(EXIT_SUCCESS);
+                    }
+                    /* Read the filename */
+                    nbytes = read(server, filename, lenfilename);
+                    if (nbytes == -1) {
+                        perror("Error read filename");
                         exit(EXIT_FAILURE);
                     }
-                } */
-                write(STDOUT_FILENO, filename, strlen(filename));
-                write(STDOUT_FILENO, "\n", 1);
-                /* Free memory */
-                free(f_content);
-                free(filename);
-                if (close(f) == -1) {
-                    perror("Error close file");
+                    if (nbytes == 0) {
+                        exit(EXIT_SUCCESS);
+                    }
+                    /* Open the file, create if it doesn't exists */
+                    f = open(filename, O_CREAT | O_WRONLY, 0644);
+                    if (f == -1) {
+                        perror("Error open file");
+                        exit(EXIT_FAILURE);
+                    }
+                    while ((nbytes = read(server, &flag, sizeof(flag))) != 0) {
+                        if (nbytes == -1) {
+                            perror("Error write");
+                            exit(EXIT_FAILURE);
+                        }
+                        /* Checking if there are other byte to receive */
+                        if (flag == '-') {
+                            nbytes = read(server, &bytewr, sizeof(bytewr));
+                            if (nbytes == -1) {
+                                perror("Error read");
+                                exit(EXIT_FAILURE);
+                            }
+                            if (nbytes == 0) {
+                                exit(EXIT_SUCCESS);
+                            }
+                            nbytes = read(server, f_content, bytewr);
+                            if (nbytes == -1) {
+                                perror("Error read file content");
+                                exit(EXIT_FAILURE);
+                            }
+                            if (nbytes == 0) {
+                                exit(EXIT_SUCCESS);
+                            }
+                            /* Write the content on the file */
+                            if (write(f, f_content, bytewr) < bytewr) {
+                                perror("Error write file content");
+                                exit(EXIT_FAILURE);
+                            }
+                        }
+                        /* No more bytes */
+                        else {
+                            break;
+                        }
+                    }
+                    /* Free memory */
+                    free(f_content);
+                    free(filename);
+                    if (close(f) == -1) {
+                        perror("Error close file");
+                        exit(EXIT_FAILURE);
+                    }
+                }
+                else if (flag_f == 'd') {
+                    continue;
+                }
+                else {
+                    break;
+                }
+                if (write(STDOUT_FILENO, "File received with success|\n", 28) < 28) {
+                    perror("Error write");
                     exit(EXIT_FAILURE);
                 }
             }
@@ -228,6 +260,10 @@ int main(int argc, char *argv[]) {
     }
     /* Free the memory */
     free(params);
+    if (close(server) == -1) {
+        perror("Error close server");
+        exit(EXIT_FAILURE);
+    }
     exit(EXIT_SUCCESS);
 }
 
