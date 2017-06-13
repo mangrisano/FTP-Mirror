@@ -10,12 +10,12 @@
 
 #define BUFSIZE 1024
 
-void get(int fd, char *params);
+void get(int fd);
 
 int main(int argc, char *argv[]) {
     struct sockaddr_in info_server;             /* Connections informations */
     int server, port;                           /* Server params */
-    char command[5], *params;
+    char command[5], *param;
     const char *error = "Command not found!\n";
     if (argc < 4) {
         perror("Error arguments");
@@ -31,8 +31,8 @@ int main(int argc, char *argv[]) {
         perror("Error socket");
         exit(EXIT_FAILURE);
     }
-    params = (char *) malloc(sizeof(char) * BUFSIZE + 1);
-    if (params == NULL) {
+    param = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+    if (param == NULL) {
         perror("Error malloc");
         exit(EXIT_FAILURE);
     }
@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     strcpy(command, argv[1]);
-    strcpy(params, argv[2]);
+    strcpy(param, argv[2]);
     /* Connection to the fd */
     if (connect(server, (struct sockaddr *) &info_server, sizeof(struct sockaddr_in)) == -1) {
         perror("Error connect");
@@ -56,18 +56,18 @@ int main(int argc, char *argv[]) {
                 perror("Error write");
                 exit(EXIT_FAILURE);
             }
-            if (write(server, params, strlen(params)) < strlen(params)) {
+            if (write(server, param, strlen(param)) < strlen(param)) {
                 perror("Error write");
                 exit(EXIT_FAILURE);
             }
-            get(server, params);
+            get(server);
     }
     else if (strcmp(command, "Put") == 0) {
         if (write(server, command, strlen(command)) < strlen(command)) {
             perror("Error write");
             exit(EXIT_FAILURE);
         }
-        if (write(server, params, strlen(params)) < strlen(params)) {
+        if (write(server, param, strlen(param)) < strlen(param)) {
             perror("Error write");
             exit(EXIT_FAILURE);
         }
@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
                 perror("Error write");
                 exit(EXIT_FAILURE);
             }
-            if (write(server, params, strlen(params)) < strlen(params)) {
+            if (write(server, param, strlen(param)) < strlen(param)) {
                 perror("Error write");
                 exit(EXIT_FAILURE);
             }
@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
         }
         exit(EXIT_FAILURE);
     }
-    free(params);
+    free(param);
     if (close(server) == -1) {
         perror("Error close server");
         exit(EXIT_FAILURE);
@@ -97,8 +97,8 @@ int main(int argc, char *argv[]) {
     exit(EXIT_SUCCESS);
 }
 
-void get(int fd, char *params) {    
-    int f;                                      /* Filedescritor for the file that has to be creat */
+void get(int fd) {    
+    int f;                                      /* File descriptor for the file that has to be created */
     int found = 0;
     char *f_content;                            /* Content of the file */
     char *filename;
@@ -113,7 +113,6 @@ void get(int fd, char *params) {
     if (found == 1) {
         /* Receive the type of the file */
         nbytes = read(fd, type, 3);
-        printf("type: %s\n", type);
         if (nbytes == -1) {
             perror("Error read");
             exit(EXIT_FAILURE);
@@ -123,14 +122,35 @@ void get(int fd, char *params) {
         }
         /* Check the type of the file */
         if (strcmp(type, "REG") == 0) {
-            printf("type is reg\n");
+            filename = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+            if (filename == NULL) {
+                perror("Error malloc");
+                exit(EXIT_FAILURE);
+            }
             f_content = (char *) malloc(sizeof(char) * BUFSIZE + 1);
             if (f_content == NULL) {
                 perror("Error malloc");
                 exit(EXIT_FAILURE);
             }
+            nbytes = read(fd, &lenfilename, sizeof(lenfilename));
+            if (nbytes == -1) {
+                perror("Error read");
+                exit(EXIT_FAILURE);
+            }
+            if (nbytes == 0) {
+                exit(EXIT_SUCCESS);
+            }
+            nbytes = read(fd, filename, lenfilename);
+            if (nbytes == -1) {
+                perror("Error read");
+                exit(EXIT_FAILURE);
+            }
+            if (nbytes == 0) {
+                exit(EXIT_SUCCESS);
+            }
+            filename[nbytes] = '\0';
             /* Create the file if doesn't exist in write-only */
-            f = open(params, O_CREAT | O_WRONLY, 0644);
+            f = open(filename, O_CREAT | O_WRONLY, 0644);
             if (f == -1) {
                 perror("Error open");
                 exit(EXIT_FAILURE);
@@ -174,6 +194,7 @@ void get(int fd, char *params) {
             }
             /* Free memory */
             free(f_content);
+            free(filename);
             if (close(f) == -1) {
                 perror("Error closing file");
                 exit(EXIT_FAILURE);
@@ -219,6 +240,7 @@ void get(int fd, char *params) {
                     if (nbytes == 0) {
                         exit(EXIT_SUCCESS);
                     }
+                    filename[nbytes] = '\0';
                     /* Open the file, create if it doesn't exists */
                     f = open(filename, O_CREAT | O_WRONLY, 0644);
                     if (f == -1) {
@@ -248,6 +270,7 @@ void get(int fd, char *params) {
                             if (nbytes == 0) {
                                 exit(EXIT_SUCCESS);
                             }
+                            f_content[nbytes] = '\0';
                             /* Write the content on the file */
                             if (write(f, f_content, bytewr) < bytewr) {
                                 perror("Error write file content");
@@ -278,9 +301,6 @@ void get(int fd, char *params) {
                     exit(EXIT_FAILURE);
                 }
             }
-        }
-        else {
-            printf("Warning\n");
         }
     }
     else {
