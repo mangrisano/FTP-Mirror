@@ -140,7 +140,6 @@ void get(int fd, char *filedir, char *filename) {
     char *fname;                                    /* Name of the file */
     char flag = '-';                                /* Flag to close the transfer */
     char flag_f = 'f';                              /* Flag to say if there are more file regular */
-
     dp = opendir(filedir);
     if (dp == NULL) {
         perror("Error opendir");
