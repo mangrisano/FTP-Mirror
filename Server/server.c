@@ -133,7 +133,7 @@ void get(int fd, char *filedir, char *filename) {
     struct dirent *de;                              /* de is for directory entry */
     struct stat buf;                                /* buf contains the file's informations */
     int found = 0;                                  /* 1 if filename is found; 0 otherwise */
-    size_t lenfname = 0;                            /* Length of the filename */
+    size_t lenfilename = 0;                         /* Length of the filename */
     int f;                                          /* Filedescriptor for the file that has to be read */
     ssize_t nbytes;                                 /* Num of bytes read */
     char *f_content;                                /* Content of the file */
@@ -163,8 +163,17 @@ void get(int fd, char *filedir, char *filename) {
                     perror("Error write");
                     exit(EXIT_FAILURE);
                 }
+                lenfilename = strlen(filename);
+                if (write(fd, &lenfilename, sizeof(lenfilename)) < sizeof(lenfilename)) {
+                    perror("Error write");
+                    exit(EXIT_FAILURE);
+                }
+                if (write(fd, filename, lenfilename) < lenfilename) {
+                    perror("Error write");
+                    exit(EXIT_FAILURE);
+                }
                 /* Open the file with READONLY permissions */
-                f = open(de->d_name, O_RDONLY);
+                f = open(filename, O_RDONLY);
                 if (f == -1) {
                     perror("Error open file");
                     exit(EXIT_FAILURE);
@@ -254,14 +263,14 @@ void get(int fd, char *filedir, char *filename) {
                                 perror("The length of the command is too big. Memory leak");
                                 exit(EXIT_FAILURE);
                             }
-                            lenfname = strlen(fname);
+                            lenfilename = strlen(fname);
                             /* Send to the client the length of the filename */
-                            if (write(fd, &lenfname, sizeof(lenfname)) < sizeof(lenfname)) {
+                            if (write(fd, &lenfilename, sizeof(lenfilename)) < sizeof(lenfilename)) {
                                 perror("Error write");
                                 exit(EXIT_FAILURE);
                             }
                             /* Send to the client the filename */
-                            if (write(fd, fname, lenfname) < lenfname) {
+                            if (write(fd, fname, lenfilename) < lenfilename) {
                                 perror("Error write");
                                 exit(EXIT_FAILURE);
                             }                            
