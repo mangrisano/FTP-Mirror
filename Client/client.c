@@ -120,6 +120,7 @@ void get(int fd) {
         if (nbytes == 0) {
             exit(EXIT_SUCCESS);
         }
+        type[nbytes] = '\0';
         /* Check the type of the file */
         if (strcmp(type, "REG") == 0) {
             filename = (char *) malloc(sizeof(char) * BUFSIZE + 1);
