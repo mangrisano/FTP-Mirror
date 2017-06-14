@@ -133,8 +133,8 @@ void get(int fd, char *filedir, char *filename) {
     struct dirent *de;                              /* de is for directory entry */
     struct stat buf;                                /* buf contains the file's informations */
     int found = 0;                                  /* 1 if filename is found; 0 otherwise */
-    size_t lenfilename = 0;                         /* Length of the filename */
     int f;                                          /* Filedescriptor for the file that has to be read */
+    size_t lenfilename = 0;                         /* Length of the filename */
     ssize_t nbytes;                                 /* Num of bytes read */
     char *f_content;                                /* Content of the file */
     char *fname;                                    /* Name of the file */
@@ -145,6 +145,7 @@ void get(int fd, char *filedir, char *filename) {
         perror("Error opendir");
         exit(EXIT_FAILURE);
     }
+    /* Read the directory */
     while ((de = readdir(dp)) != NULL) {
         if (strcmp(de->d_name, filename) == 0) {
             found = 1;
@@ -252,11 +253,11 @@ void get(int fd, char *filedir, char *filename) {
                                 perror("Error malloc");
                                 exit(EXIT_FAILURE);
                             }
-                            /* Copy the name of the file in fname */
                             if (strlen(fname) >= BUFSIZE) {
                                 perror("Error: the length of the filename is too big. Memory leak");
                                 exit(EXIT_FAILURE);
                             }
+                            /* Copy the name of the file in fname */
                             strcpy(fname, de->d_name);
                             if (strlen(fname) >= BUFSIZE) {
                                 perror("The length of the command is too big. Memory leak");

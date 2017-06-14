@@ -107,7 +107,7 @@ void get(int fd) {
     char flag_f = '#';                          /* Flag to say if there are more file regular */
     size_t lenfilename = 0;
     ssize_t nbytes;                             /* Num of bytes read */
-    size_t bytewr;  
+    size_t bytewr;                              /* Bytes to write */ 
     /* 1 if the file is found; 0 otherwise */
     read(fd, &found, sizeof(found));
     if (found == 1) {
