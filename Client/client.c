@@ -11,6 +11,7 @@
 #define BUFSIZE 1024
 
 void get(int fd);
+void list(int fd);
 
 int main(int argc, char *argv[]) {
     struct sockaddr_in info_server;             /* Connections informations */
@@ -81,6 +82,7 @@ int main(int argc, char *argv[]) {
                 perror("Error write");
                 exit(EXIT_FAILURE);
             }
+            list(server);
     }
     else {
         if (write(STDERR_FILENO, error, strlen(error)) < strlen(error)) {
@@ -102,14 +104,18 @@ void get(int fd) {
     int found = 0;
     char *f_content;                            /* Content of the file */
     char *filename;
-    char type[3];
+    char type[4];
     char flag = '+';                            /* Flag to set the end of transfer */
     char flag_f = '#';                          /* Flag to say if there are more file regular */
     size_t lenfilename = 0;
     ssize_t nbytes;                             /* Num of bytes read */
     size_t bytewr;                              /* Bytes to write */ 
     /* 1 if the file is found; 0 otherwise */
-    read(fd, &found, sizeof(found));
+    nbytes = read(fd, &found, sizeof(found));
+    if (nbytes == -1) {
+        perror("Error read");
+        exit(EXIT_FAILURE);
+    }
     if (found == 1) {
         /* Receive the type of the file */
         nbytes = read(fd, type, 3);
@@ -121,7 +127,7 @@ void get(int fd) {
             exit(EXIT_SUCCESS);
         }
         type[nbytes] = '\0';
-        /* Check the type of the file */
+        /* If the file is a regular file */
         if (strcmp(type, "REG") == 0) {
             filename = (char *) malloc(sizeof(char) * BUFSIZE + 1);
             if (filename == NULL) {
@@ -201,7 +207,7 @@ void get(int fd) {
                 exit(EXIT_FAILURE);
             }
         }
-        /* Check the type of the file */
+        /* If the file is a directory */
         else if (strcmp(type, "DIR") == 0) {
             for (;;) {
                 nbytes = read(fd, &flag_f, sizeof(flag_f));
@@ -212,6 +218,7 @@ void get(int fd) {
                 if (nbytes == 0) {
                     exit(EXIT_SUCCESS);
                 }
+                /* It's a file */
                 if (flag_f == 'f') {
                     filename = (char *) malloc(sizeof(char) * BUFSIZE + 1);
                     if (filename == NULL) {
@@ -253,8 +260,9 @@ void get(int fd) {
                             perror("Error write");
                             exit(EXIT_FAILURE);
                         }
-                        /* Checking if there are other byte to receive */
+                        /* Check if there are other bytes to receive */
                         if (flag == '-') {
+                            /* Read the bytes to write */
                             nbytes = read(fd, &bytewr, sizeof(bytewr));
                             if (nbytes == -1) {
                                 perror("Error read");
@@ -263,6 +271,7 @@ void get(int fd) {
                             if (nbytes == 0) {
                                 exit(EXIT_SUCCESS);
                             }
+                            /* Write the content on the file */
                             nbytes = read(fd, f_content, bytewr);
                             if (nbytes == -1) {
                                 perror("Error read file content");
@@ -286,16 +295,21 @@ void get(int fd) {
                     /* Free memory */
                     free(f_content);
                     free(filename);
+                    /* Close the file */
                     if (close(f) == -1) {
                         perror("Error close file");
                         exit(EXIT_FAILURE);
                     }
                 }
+                /* It's a directory */
                 else if (flag_f == 'd') {
                     continue;
                 }
+                /* No more files */
                 else {
-                    break;
+                    if (flag_f == 'e') {
+                        break;
+                    }
                 }
                 if (write(STDOUT_FILENO, "File received with success|\n", 28) < 28) {
                     perror("Error write");
@@ -303,10 +317,137 @@ void get(int fd) {
                 }
             }
         }
+        else {
+            if (write(STDOUT_FILENO, "The file is not a regular file/directory!\n", 42) < 42) {
+                    perror("Error write");
+                    exit(EXIT_SUCCESS);
+            }
+        }
     }
     else {
-        write(STDOUT_FILENO, "File not found!\n", 16);
+        if (write(STDOUT_FILENO, "File not found!\n", 16) < 16) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
+void list(int fd) {
+    off_t sizefilename;                       /* Size in byte of the filename */
+    ssize_t nbytes;                           /* Number of bytes read */
+    size_t lenfilename;                       /* Length of the filename */
+    char buf[128];                            /* Message to output */
+    char type[4];                             /* Type of the file: REG or DIR */
+    char flag_f = '#';                        /* Flag to say if there is a regular file */
+    char *filename;
+    int found = 0;                            /* 1 if file is found; 0 otherwise */
+    nbytes = read(fd, &found, sizeof(found));
+    if (nbytes == -1) {
+        perror("Error read");
         exit(EXIT_FAILURE);
+    }
+    /* If file is found */
+    if (found == 1) {
+        nbytes = read(fd, type, 3);
+        if (nbytes == -1) {
+            perror("Error read");
+            exit(EXIT_FAILURE);
+        }
+        if (nbytes == 0) {
+            exit(EXIT_SUCCESS);
+        }
+        type[nbytes] = '\0';
+        /* If the file is a regular file */
+        if (strcmp(type, "REG") == 0) {
+            nbytes = read(fd, &sizefilename, sizeof(sizefilename));
+            if (nbytes == -1) {
+                perror("Error read");
+                exit(EXIT_FAILURE);
+            }
+            if (nbytes == 0) {
+                exit(EXIT_SUCCESS);
+            }
+            sprintf(buf, "The size of the file is %lld\n", sizefilename);
+            if (write(STDOUT_FILENO, buf, strlen(buf)) < strlen(buf)) {
+                perror("Error write");
+                exit(EXIT_FAILURE);
+            }
+        }
+        /* If the file is a directory */
+        else if (strcmp(type, "DIR") == 0) {
+            for (;;) {
+                nbytes = read(fd, &flag_f, sizeof(flag_f));
+                if (nbytes == -1) {
+                    perror("Error read");
+                    exit(EXIT_FAILURE);
+                }
+                if (nbytes == 0) {
+                    exit(EXIT_SUCCESS);
+                }
+                /* It's a file */
+                if (flag_f == 'f') {
+                    if (nbytes == -1) {
+                        perror("Error read");
+                        exit(EXIT_FAILURE);
+                    }
+                    filename = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+                    if (filename == NULL) {
+                        perror("Error malloc");
+                        exit(EXIT_FAILURE);
+                    }
+                    /* Read the length of the filename */
+                    nbytes = read(fd, &lenfilename, sizeof(lenfilename));
+                    if (nbytes == -1) {
+                        perror("Error read");
+                        exit(EXIT_FAILURE);
+                    }
+                    if (nbytes == 0) {
+                        exit(EXIT_SUCCESS);
+                    }
+                    /* Read the filename */
+                    nbytes = read(fd, filename, lenfilename);
+                    if (nbytes == -1) {
+                        perror("Error read");
+                        exit(EXIT_FAILURE);
+                    }
+                    filename[nbytes] = '\0';
+                    /* Read the size of the file in byte */
+                    nbytes = read(fd, &sizefilename, sizeof(sizefilename));
+                    if (nbytes == -1) {
+                        perror("Error read");
+                        exit(EXIT_FAILURE);
+                    }
+                    sprintf(buf, "The file %s has size: %llu\n", filename, sizefilename);
+                    if (write(STDOUT_FILENO, buf, strlen(buf)) < strlen(buf)) {
+                        perror("Error write");
+                        exit(EXIT_FAILURE);
+                    }
+                    free(filename);
+                }
+                /* It's a directory */
+                else if (flag_f == 'd') {
+                    continue;
+                }
+                /* No more files */
+                else {
+                    if (flag_f == 'e') {
+                        break;
+                    }
+                }
+            }
+        }
+        else {
+            if (write(STDOUT_FILENO, "The file is not a regular file/directory!\n", 42) < 42) {
+                    perror("Error write");
+                    exit(EXIT_SUCCESS);
+            }
+        }
+    }
+    else {
+        if (write(STDOUT_FILENO, "File not found!\n", 16) < 16) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
+        }
     }
 }
 

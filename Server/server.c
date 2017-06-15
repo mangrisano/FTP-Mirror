@@ -15,7 +15,7 @@
 
 void get(int fd, char *filedir, char *filename);
 void put(int fd, char *filename);
-void list(int fd, char *filename);
+void list(int fd, char *dirname, char *filename);
 
 int main(int argc, char *argv[]) {
     struct sockaddr_in info_server, info_client;          /* Connections informations */
@@ -108,11 +108,13 @@ int main(int argc, char *argv[]) {
                 /* Do something */
             }
             else if (strcmp(command, "Lis") == 0) {
-                if (write(STDOUT_FILENO, "List received...\n", 17) < 17) {
+                list(client, argv[2], param);
+            }
+            else {
+                if (write(client, "Command not found!\n", 19) < 19) {
                     perror("Error write");
                     exit(EXIT_FAILURE);
                 }
-                /* Do something */
             }
             /* Free memory */
             free(param);
@@ -127,7 +129,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_SUCCESS);
 }
 
-void get(int fd, char *filedir, char *filename) {
+void get(int fd, char *dirname, char *filename) {
     DIR *dp;                                        /* dp is for directory parent */
     DIR *dc;                                        /* dc is for directoy child */
     struct dirent *de;                              /* de is for directory entry */
@@ -140,7 +142,7 @@ void get(int fd, char *filedir, char *filename) {
     char *fname;                                    /* Name of the file */
     char flag = '-';                                /* Flag to close the transfer */
     char flag_f = 'f';                              /* Flag to say if there are more file regular */
-    dp = opendir(filedir);
+    dp = opendir(dirname);
     if (dp == NULL) {
         perror("Error opendir");
         exit(EXIT_FAILURE);
@@ -227,6 +229,10 @@ void get(int fd, char *filedir, char *filename) {
                     /* Change the directory */
                     chdir(filename);
                     dc = opendir(".");
+                    if (dc == NULL) {
+                        perror("Error opendir");
+                        exit(EXIT_FAILURE);
+                    }
                     /* Read the directory */
                     while ((de = readdir(dc)) != NULL) {
                         if ((strcmp(de->d_name, ".") == 0) || (strcmp(de->d_name, "..") == 0)) {
@@ -237,7 +243,8 @@ void get(int fd, char *filedir, char *filename) {
                             exit(EXIT_FAILURE);
                         }
                         if (S_ISREG(buf.st_mode)) {
-                            flag_f = 'f'; /* Is a file */
+                            /* It's a file */
+                            flag_f = 'f';
                             if (write(fd, &flag_f, sizeof(flag_f)) < sizeof(flag_f)) {
                                 perror("Error write");
                                 exit(EXIT_FAILURE);
@@ -253,23 +260,19 @@ void get(int fd, char *filedir, char *filename) {
                                 perror("Error malloc");
                                 exit(EXIT_FAILURE);
                             }
-                            if (strlen(fname) >= BUFSIZE) {
+                            if (strlen(de->d_name) >= BUFSIZE) {
                                 perror("Error: the length of the filename is too big. Memory leak");
                                 exit(EXIT_FAILURE);
                             }
                             /* Copy the name of the file in fname */
                             strcpy(fname, de->d_name);
-                            if (strlen(fname) >= BUFSIZE) {
-                                perror("The length of the command is too big. Memory leak");
-                                exit(EXIT_FAILURE);
-                            }
                             lenfilename = strlen(fname);
-                            /* Send to the client the length of the filename */
+                            /* Send the length of the filename to the client */
                             if (write(fd, &lenfilename, sizeof(lenfilename)) < sizeof(lenfilename)) {
                                 perror("Error write");
                                 exit(EXIT_FAILURE);
                             }
-                            /* Send to the client the filename */
+                            /* Send the filename to the client */
                             if (write(fd, fname, lenfilename) < lenfilename) {
                                 perror("Error write");
                                 exit(EXIT_FAILURE);
@@ -280,8 +283,9 @@ void get(int fd, char *filedir, char *filename) {
                                 perror("Error open file");
                                 exit(EXIT_FAILURE);
                             }
-                            /* Read the file content, 100 byte at once */
+                            /* Read the file content, 100 byte at a time */
                             while ((nbytes = read(f, f_content, 100)) != 0) {
+                                /* There are some bytes to write */
                                 flag = '-';
                                 if (write(fd, &flag, sizeof(flag)) < sizeof(flag)) {
                                     perror("Error write");
@@ -297,6 +301,7 @@ void get(int fd, char *filedir, char *filename) {
                                 }
                                 sleep(1);
                             }
+                            /* No more bytes */
                             flag = '+';
                             if (write(fd, &flag, sizeof(flag)) < sizeof(flag)) {
                                 perror("Error write");
@@ -312,14 +317,16 @@ void get(int fd, char *filedir, char *filename) {
                             free(fname);
                         }
                         else {
-                            flag_f = 'd'; /* Is a directory */
+                            /* It's a directory */
+                            flag_f = 'd';
                             if (write(fd, &flag_f, sizeof(flag_f)) < sizeof(flag_f)) {
                                 perror("Error write");
                                 exit(EXIT_FAILURE);
                             }
                         }
                     }
-                    flag_f = 'e'; /* No more files */
+                    /* No more files */
+                    flag_f = 'e';
                     if (write(fd, &flag_f, sizeof(flag_f)) < sizeof(flag_f)) {
                         perror("Error write");
                         exit(EXIT_FAILURE);
@@ -340,3 +347,132 @@ void get(int fd, char *filedir, char *filename) {
     }
     exit(EXIT_SUCCESS);
 }
+
+void list(int fd, char *dirname, char *filename) {
+    DIR *dp;                            /* Parent directory */
+    DIR *dc;                            /* Child directory */
+    struct dirent *de;                  /* Directory entry */
+    struct stat buf;                    /* File's informations */
+    int found = 0;                      /* 1 if the file is found; 0 otherwise */
+    char *fname;                        /* Name of the file */
+    char flag_f = '#';                  /* Flag to say if the file is a regular file or a dir */
+    size_t lenfname = 0;                /* Length of the filename */
+    /* Open the directory */
+    dp = opendir(dirname);
+    if (dp == NULL) {
+        perror("Error opendir");
+        exit(EXIT_FAILURE);
+    }
+    /* Read inside the directory */
+    while ((de = readdir(dp)) != NULL) {
+        if (strcmp(de->d_name, filename) == 0) {
+            /* The file is found */
+            found = 1;
+            if (write(fd, &found, sizeof(found)) < sizeof(found)) {
+                perror("Error write");
+                exit(EXIT_FAILURE);
+            }
+            if (stat(de->d_name, &buf) == -1) {
+                perror("Error stat");
+                exit(EXIT_FAILURE);
+            }
+            /* It's a file */
+            if (S_ISREG(buf.st_mode)) {
+                if (write(fd, "REG", 3) < 3) {
+                    perror("Error write");
+                    exit(EXIT_SUCCESS);
+                }
+                if (write(fd, &buf.st_size, sizeof(off_t)) < sizeof(off_t)) {
+                    perror("Error write");
+                    exit(EXIT_FAILURE);
+                }
+            }
+            /* It's a directory */
+            else {
+                if (S_ISDIR(buf.st_mode)) {
+                    if (write(fd, "DIR", 3) < 3) {
+                        perror("Error write");
+                        exit(EXIT_FAILURE);
+                    }
+                    /* Change directory */
+                    chdir(filename);
+                    dc = opendir(".");
+                    if (dc == NULL) {
+                        perror("Error opendir");
+                        exit(EXIT_FAILURE);
+                    }
+                    while ((de = readdir(dc)) != NULL) {
+                        if ((strcmp(de->d_name, ".") == 0) || (strcmp(de->d_name, "..") == 0)) {
+                            continue;
+                        }
+                        if (stat(de->d_name, &buf) == -1) {
+                            perror("Error stat");
+                            exit(EXIT_FAILURE);
+                        }
+                        /* It's a file */
+                        if (S_ISREG(buf.st_mode)) {
+                            flag_f = 'f';
+                            if (write(fd, &flag_f, sizeof(flag_f)) < sizeof(flag_f)) {
+                                perror("Error write");
+                                exit(EXIT_FAILURE);
+                            }
+                            fname = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+                            if (fname == NULL) {
+                                perror("Error malloc");
+                                exit(EXIT_FAILURE);
+                            }
+                            if (strlen(de->d_name) >= BUFSIZE) {
+                                perror("Error: The length of the filename is too big. Memory leak");
+                                exit(EXIT_FAILURE);
+                            }
+                            strcpy(fname, de->d_name);
+                            lenfname = strlen(fname);
+                            /* Write to the client the length of the filename */
+                            if (write(fd, &lenfname, sizeof(lenfname)) < sizeof(lenfname)) {
+                                perror("Error write");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Write to the client the filename */
+                            if (write(fd, fname, lenfname) < lenfname) {
+                                perror("Error write");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Write to the client the size of the file in byte */
+                            if (write(fd, &buf.st_size, sizeof(off_t)) < sizeof(off_t)) {
+                                perror("Error write");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Free memory */
+                            free(fname);
+                        }
+                        else {
+                            /* It's a directory */
+                            flag_f = 'd';
+                            if (write(fd, &flag_f, sizeof(flag_f)) < sizeof(flag_f)) {
+                                perror("Error write");
+                                exit(EXIT_FAILURE);
+                            }
+                        }
+                    }
+                    /* No more files */
+                    flag_f = 'e';
+                    if (write(fd, &flag_f, sizeof(flag_f)) < sizeof(flag_f)) {
+                        perror("Error write");
+                        exit(EXIT_FAILURE);
+                    }
+                    /* Close the child directory */
+                    if (closedir(dc) == -1) {
+                        perror("Error closedir");
+                        exit(EXIT_FAILURE);
+                    }
+                }
+            }
+        }
+    }
+    /* Close the parent directory */
+    if (closedir(dp) == -1) {
+        perror("Error closedir");
+        exit(EXIT_FAILURE);
+    }
+}
+
