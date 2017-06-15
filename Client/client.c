@@ -47,21 +47,21 @@ int main(int argc, char *argv[]) {
     }
     strcpy(command, argv[1]);
     strcpy(param, argv[2]);
-    /* Connection to the fd */
+    /* Connection to the server */
     if (connect(server, (struct sockaddr *) &info_server, sizeof(struct sockaddr_in)) == -1) {
         perror("Error connect");
         exit(EXIT_FAILURE);
     }
     if (strcmp(command, "Get") == 0) {
-            if (write(server, command, strlen(command)) < strlen(command)) {
-                perror("Error write");
-                exit(EXIT_FAILURE);
-            }
-            if (write(server, param, strlen(param)) < strlen(param)) {
-                perror("Error write");
-                exit(EXIT_FAILURE);
-            }
-            get(server);
+        if (write(server, command, strlen(command)) < strlen(command)) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
+        }
+        if (write(server, param, strlen(param)) < strlen(param)) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
+        }
+        get(server);
     }
     else if (strcmp(command, "Put") == 0) {
         if (write(server, command, strlen(command)) < strlen(command)) {
@@ -74,15 +74,15 @@ int main(int argc, char *argv[]) {
         }
     }
     else if (strcmp(command, "List") == 0) {
-            if (write(server, command, strlen(command) - 1) < strlen(command) - 1) {
-                perror("Error write");
-                exit(EXIT_FAILURE);
-            }
-            if (write(server, param, strlen(param)) < strlen(param)) {
-                perror("Error write");
-                exit(EXIT_FAILURE);
-            }
-            list(server);
+        if (write(server, command, strlen(command) - 1) < strlen(command) - 1) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
+        }
+        if (write(server, param, strlen(param)) < strlen(param)) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
+        }
+        list(server);
     }
     else {
         if (write(STDERR_FILENO, error, strlen(error)) < strlen(error)) {
@@ -336,7 +336,7 @@ void list(int fd) {
     off_t sizefilename;                       /* Size in byte of the filename */
     ssize_t nbytes;                           /* Number of bytes read */
     size_t lenfilename;                       /* Length of the filename */
-    char buf[128];                            /* Message to output */
+    char buf[1033];                           /* Message to output */
     char type[4];                             /* Type of the file: REG or DIR */
     char flag_f = '#';                        /* Flag to say if there is a regular file */
     char *filename;
