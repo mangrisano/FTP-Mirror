@@ -7,11 +7,14 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #define BUFSIZE 1024
 
 void get(int fd);
 void list(int fd);
+void put(int fd);
 
 int main(int argc, char *argv[]) {
     struct sockaddr_in info_server;             /* Connections informations */
@@ -72,6 +75,7 @@ int main(int argc, char *argv[]) {
             perror("Error write");
             exit(EXIT_FAILURE);
         }
+        put(server);
     }
     else if (strcmp(command, "List") == 0) {
         if (write(server, command, strlen(command) - 1) < strlen(command) - 1) {
@@ -318,7 +322,7 @@ void get(int fd) {
             }
         }
         else {
-            if (write(STDOUT_FILENO, "The file is not a regular file/directory!\n", 42) < 42) {
+            if (write(STDOUT_FILENO, "The file is not a regular file/directory!\n", 45) < 45) {
                     perror("Error write");
                     exit(EXIT_SUCCESS);
             }
@@ -451,3 +455,7 @@ void list(int fd) {
     }
 }
 
+void put(int fd) {
+    int found = 1;
+    write(fd, &found, sizeof(found));
+}

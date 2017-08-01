@@ -14,8 +14,8 @@
 #define PENDING_QUEUE 5
 
 void get(int fd, char *filedir, char *filename);
-void put(int fd, char *filename);
 void list(int fd, char *dirname, char *filename);
+void put(int fd);
 
 int main(int argc, char *argv[]) {
     struct sockaddr_in info_server, info_client;          /* Connections informations */
@@ -101,11 +101,7 @@ int main(int argc, char *argv[]) {
                 get(client, argv[2], param);
             }
             else if (strcmp(command, "Put") == 0) {
-                if (write(STDOUT_FILENO, "Put received...\n", 16) < 16) {
-                    perror("Error write");
-                    exit(EXIT_FAILURE);
-                }
-                /* Do something */
+                put(client);
             }
             else if (strcmp(command, "Lis") == 0) {
                 list(client, argv[2], param);
@@ -476,3 +472,8 @@ void list(int fd, char *dirname, char *filename) {
     }
 }
 
+void put(int fd) {
+    int found = 0;
+    read(fd, &found, sizeof(found));
+    printf("found: %d\n", found);
+}
