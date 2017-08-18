@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <signal.h>
+#include <time.h>
 
 #define BUFSIZE 4096
 #define PENDING_QUEUE 5
@@ -37,7 +38,6 @@ int main(int argc, char *argv[]) {
     info_server.sin_port = htons(port);
     info_server.sin_addr.s_addr = htonl(INADDR_ANY);
     server = socket(PF_INET, SOCK_STREAM, 0);
-    signal(SIGINT, signal_handler);
     if (server == -1) {
         perror("Error socket");
         exit(EXIT_FAILURE);
@@ -52,8 +52,10 @@ int main(int argc, char *argv[]) {
         perror("Error listen");
         exit(EXIT_FAILURE);
     }
+    if (signal(SIGCHLD, signal_handler) == SIG_ERR) {
+        perror("Error signal");
+    }
     for (;;) {
-        /* signal(SIGINT, signal_handler); */
         /* Accept for incoming connections */
         client = accept(server, (struct sockaddr *) &info_client, &address_client_len);
         if (client == -1) {
@@ -140,6 +142,20 @@ int main(int argc, char *argv[]) {
         }
     }
     exit(EXIT_SUCCESS);
+}
+
+void signal_handler(int sig) {
+    pid_t child;
+    struct tm *date;
+    time_t t = time(NULL);
+    date = localtime(&t);
+    if (date == NULL) {
+        perror("Error localtime");
+        exit(EXIT_FAILURE);
+    }
+    while ((child = waitpid(-1, NULL, WNOHANG)) > 0) {
+        printf("%d:%d:%d - Process with Pid %d is terminated!\n", date->tm_hour, date->tm_min, date->tm_sec, child);
+    }
 }
 
 void get(int fd, char *dirname, char *filename) {
@@ -719,11 +735,5 @@ void put(int fd) {
             perror("Error write");
             exit(EXIT_FAILURE);
         }
-    }
-}
-
-void signal_handler(int sig) {
-    if (sig == SIGINT) {
-        printf("Segnale ricevuto: %d\n", sig);
     }
 }
