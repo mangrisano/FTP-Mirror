@@ -14,12 +14,13 @@
 
 void get(int fd);
 void list(int fd);
-void put(int fd);
+void put(int fd, char *filename);
 
 int main(int argc, char *argv[]) {
     struct sockaddr_in info_server;             /* Connections informations */
     int server, port;                           /* Server params */
     char command[5], *param;
+    ssize_t lenparam;
     const char *error = "Command not found!\n";
     if (argc < 4) {
         perror("Error arguments");
@@ -50,6 +51,7 @@ int main(int argc, char *argv[]) {
     }
     strcpy(command, argv[1]);
     strcpy(param, argv[2]);
+    lenparam = strlen(param);
     /* Connection to the server */
     if (connect(server, (struct sockaddr *) &info_server, sizeof(struct sockaddr_in)) == -1) {
         perror("Error connect");
@@ -60,7 +62,11 @@ int main(int argc, char *argv[]) {
             perror("Error write");
             exit(EXIT_FAILURE);
         }
-        if (write(server, param, strlen(param)) < strlen(param)) {
+        if (write(server, &lenparam, sizeof(lenparam)) < sizeof(lenparam)) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
+        }
+        if (write(server, param, lenparam) < lenparam) {
             perror("Error write");
             exit(EXIT_FAILURE);
         }
@@ -70,19 +76,27 @@ int main(int argc, char *argv[]) {
         if (write(server, command, strlen(command)) < strlen(command)) {
             perror("Error write");
             exit(EXIT_FAILURE);
-        }
-        if (write(server, param, strlen(param)) < strlen(param)) {
+        }        
+        if (write(server, &lenparam, sizeof(lenparam)) < sizeof(lenparam)) {
             perror("Error write");
             exit(EXIT_FAILURE);
         }
-        put(server);
+        if (write(server, param, lenparam) < lenparam) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
+        }
+        put(server, param);
     }
     else if (strcmp(command, "List") == 0) {
         if (write(server, command, strlen(command) - 1) < strlen(command) - 1) {
             perror("Error write");
             exit(EXIT_FAILURE);
+        }        
+        if (write(server, &lenparam, sizeof(lenparam)) < sizeof(lenparam)) {
+            perror("Error write");
+            exit(EXIT_FAILURE);
         }
-        if (write(server, param, strlen(param)) < strlen(param)) {
+        if (write(server, param, lenparam) <lenparam) {
             perror("Error write");
             exit(EXIT_FAILURE);
         }
@@ -396,7 +410,7 @@ void list(int fd) {
                     }
                     filename = (char *) malloc(sizeof(char) * BUFSIZE + 1);
                     if (filename == NULL) {
-                        perror("Error malloc");
+                        perror("Error malloc list");
                         exit(EXIT_FAILURE);
                     }
                     /* Read the length of the filename */
@@ -455,7 +469,221 @@ void list(int fd) {
     }
 }
 
-void put(int fd) {
-    int found = 1;
-    write(fd, &found, sizeof(found));
+void put(int fd, char *filename) {
+    DIR *dp;                                        /* dp is for directory parent */
+    DIR *dc;                                        /* dc is for directoy child */
+    struct dirent *de;                              /* de is for directory entry */
+    struct stat buf;                                /* buf contains the file's informations */
+    int found = 0;                                  /* 1 if filename is found; 0 otherwise */
+    int f;                                          /* Filedescriptor for the file that has to be read */
+    size_t lenfilename = 0;                         /* Length of the filename */
+    ssize_t nbytes;                                 /* Num of bytes read */
+    char *f_content;                                /* Content of the file */
+    char *fname;                                    /* Name of the file */
+    char flag = '-';                                /* Flag to close the transfer */
+    char flag_f = 'f';                              /* Flag to say if there are more file regular */
+    dp = opendir(".");
+    if (dp == NULL) {
+        perror("Error opendir");
+        exit(EXIT_FAILURE);
+    }
+    /* Read the directory */
+    while ((de = readdir(dp)) != NULL) {
+        if (strcmp(de->d_name, filename) == 0) {
+            found = 1;
+            if (write(fd, &found, sizeof(found)) < sizeof(found)) {
+                perror("Error write");
+                exit(EXIT_FAILURE);
+            }
+            if (stat(de->d_name, &buf) == -1) {
+                perror("Error stat");
+                exit(EXIT_FAILURE);
+            }
+            /* If the param of the client is a regular file */
+            if (S_ISREG(buf.st_mode)) {
+                if (write(fd, "REG", 3) < 3) {
+                    perror("Error write");
+                    exit(EXIT_FAILURE);
+                }
+                lenfilename = strlen(filename);
+                if (write(fd, &lenfilename, sizeof(lenfilename)) < sizeof(lenfilename)) {
+                    perror("Error write");
+                    exit(EXIT_FAILURE);
+                }
+                if (write(fd, filename, lenfilename) < lenfilename) {
+                    perror("Error write");
+                    exit(EXIT_FAILURE);
+                }
+                /* Open the file with READONLY permissions */
+                f = open(filename, O_RDONLY);
+                if (f == -1) {
+                    perror("Error open file");
+                    exit(EXIT_FAILURE);
+                }
+                /* Malloc the space for the content of the file */
+                f_content = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+                if (f_content == NULL) {
+                    perror("Error malloc");
+                    exit(EXIT_FAILURE);
+                }
+                /* Read the content of the file */
+                while ((nbytes = read(f, f_content, 100)) != 0) {
+                    if (nbytes == -1) {
+                        perror("Error read");
+                        exit(EXIT_FAILURE);
+                    }
+                    if (write(fd, &flag, sizeof(flag)) < sizeof(flag)) {
+                        perror("Error write");
+                        exit(EXIT_FAILURE);
+                    }
+                    if (write(fd, &nbytes, sizeof(nbytes)) < sizeof(nbytes)) {
+                        perror("Error write");
+                        exit(EXIT_FAILURE);
+                    }
+                    /* Send the content to the fd */
+                    if (write(fd, f_content, nbytes) < nbytes) {
+                        perror("Error write");
+                        exit(EXIT_FAILURE);
+                    }
+                    sleep(1);
+                }
+                flag = '+';
+                if (write(fd, &flag, sizeof(flag)) < sizeof(flag)) {
+                    perror("Error write");
+                    exit(EXIT_FAILURE);
+                }
+                if (close(f) == -1) {
+                    perror("Error closing file");
+                    exit(EXIT_FAILURE);
+                }
+                /* Free the space */
+                free(f_content);
+            }
+            /* If the param of the client is a directory */
+            else {
+                if (S_ISDIR(buf.st_mode)) {
+                    if (write(fd, "DIR", 3) < 3) {
+                        perror("Error write");
+                        exit(EXIT_FAILURE);
+                    }
+                    /* Change the directory */
+                    chdir(filename);
+                    dc = opendir(".");
+                    if (dc == NULL) {
+                        perror("Error opendir");
+                        exit(EXIT_FAILURE);
+                    }
+                    /* Read the directory */
+                    while ((de = readdir(dc)) != NULL) {
+                        if ((strcmp(de->d_name, ".") == 0) || (strcmp(de->d_name, "..") == 0)) {
+                            continue;
+                        }
+                        if (stat(de->d_name, &buf) == -1) {
+                            perror("Error stat");
+                            exit(EXIT_FAILURE);
+                        }
+                        if (S_ISREG(buf.st_mode)) {
+                            /* It's a file */
+                            flag_f = 'f';
+                            if (write(fd, &flag_f, sizeof(flag_f)) < sizeof(flag_f)) {
+                                perror("Error write");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Malloc the space for the filename and check */
+                            fname = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+                            if (fname == NULL) {
+                                perror("Error malloc");
+                                exit(EXIT_FAILURE);
+                            }
+                            f_content = (char *) malloc(sizeof(char) * BUFSIZE + 1);
+                            if (f_content == NULL) {
+                                perror("Error malloc");
+                                exit(EXIT_FAILURE);
+                            }
+                            if (strlen(de->d_name) >= BUFSIZE) {
+                                perror("Error: the length of the filename is too big. Memory leak");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Copy the name of the file in fname */
+                            strcpy(fname, de->d_name);
+                            lenfilename = strlen(fname);
+                            /* Send the length of the filename to the client */
+                            if (write(fd, &lenfilename, sizeof(lenfilename)) < sizeof(lenfilename)) {
+                                perror("Error write");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Send the filename to the client */
+                            if (write(fd, fname, lenfilename) < lenfilename) {
+                                perror("Error write");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Open the file */
+                            f = open(fname, O_RDONLY);
+                            if (f == -1) {
+                                perror("Error open file");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Read the file content, 100 byte at a time */
+                            while ((nbytes = read(f, f_content, 100)) != 0) {
+                                /* There are some bytes to write */
+                                flag = '-';
+                                if (write(fd, &flag, sizeof(flag)) < sizeof(flag)) {
+                                    perror("Error write");
+                                    exit(EXIT_FAILURE);
+                                }
+                                if (write(fd, &nbytes, sizeof(nbytes)) < sizeof(nbytes)) {
+                                    perror("Error write");
+                                    exit(EXIT_FAILURE);
+                                }
+                                if (write(fd, f_content, nbytes) < nbytes) {
+                                    perror("Error write");
+                                    exit(EXIT_FAILURE);
+                                }
+                                sleep(1);
+                            }
+                            /* No more bytes */
+                            flag = '+';
+                            if (write(fd, &flag, sizeof(flag)) < sizeof(flag)) {
+                                perror("Error write");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Close the file */
+                            if (close(f) == -1) {
+                                perror("Error close file");
+                                exit(EXIT_FAILURE);
+                            }
+                            /* Free memory */
+                            free(f_content);
+                            free(fname);
+                        }
+                        else {
+                            /* It's a directory */
+                            flag_f = 'd';
+                            if (write(fd, &flag_f, sizeof(flag_f)) < sizeof(flag_f)) {
+                                perror("Error write");
+                                exit(EXIT_FAILURE);
+                            }
+                        }
+                    }
+                    /* No more files */
+                    flag_f = 'e';
+                    if (write(fd, &flag_f, sizeof(flag_f)) < sizeof(flag_f)) {
+                        perror("Error write");
+                        exit(EXIT_FAILURE);
+                    }
+                    /* Close the directory child */
+                    if (closedir(dc) == -1) {
+                        perror("Error closedir");
+                        exit(EXIT_FAILURE);
+                    }
+                }
+            }
+        }
+    }
+    /* Close the directory parent */
+    if (closedir(dp) == -1) {
+        perror("Error close");
+        exit(EXIT_FAILURE);
+    }
+    exit(EXIT_SUCCESS);
 }
